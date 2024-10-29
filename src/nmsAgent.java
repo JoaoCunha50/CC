@@ -1,36 +1,37 @@
-import java.io.*;
-import java.net.*;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+import java.util.Scanner;
 
 public class nmsAgent {
     public static void main(String[] args) {
-        String host = "localhost";
-        int port = 5000;
+        String serverAddress = "127.0.0.1"; // Endereço IP do servidor
+        int port = 12345; // Porta do servidor
 
-        try (Socket socket = new Socket(host, port);
-             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        try (Socket socket = new Socket(serverAddress, port);
              PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-             BufferedReader consoleInput = new BufferedReader(new InputStreamReader(System.in))) {
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             Scanner scanner = new Scanner(System.in)) {
 
-            System.out.println("Connected to server on port " + port);
-            System.out.println("Type messages to send to the server. Type 'exit' to quit.");
+            System.out.println("Conectado ao servidor em " + serverAddress + ":" + port);
 
             String message;
             while (true) {
-                System.out.print("Enter message: ");
-                message = consoleInput.readLine();
-                if (message.equalsIgnoreCase("exit")) {
+                System.out.print("Digite uma mensagem para enviar (ou 'sair' para desconectar): ");
+                message = scanner.nextLine();
+                out.println(message); // Envia a mensagem ao servidor
+
+                if ("sair".equalsIgnoreCase(message)) {
+                    System.out.println("Desconectando do servidor.");
                     break;
                 }
 
-                // Send message to server
-                out.println(message);
-
-                // Read response from server
+                // Recebe e exibe a resposta do servidor
                 String response = in.readLine();
-                System.out.println("Server response: " + response);
+                System.out.println("Resposta do servidor: " + response);
             }
-
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
