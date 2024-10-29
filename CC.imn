@@ -1,0 +1,258 @@
+node n1 {
+    type router
+    model router
+    network-config {
+	hostname n1
+	!
+	interface eth2
+	 ip address 10.0.7.2/24
+	 mac address 00:00:00:aa:00:0f
+	!
+	interface eth1
+	 ip address 10.0.3.1/24
+	 mac address 00:00:00:aa:00:06
+	!
+	interface eth0
+	 ip address 10.0.0.1/24
+	 mac address 00:00:00:aa:00:00
+	!
+    }
+    canvas c1
+    iconcoords {271.0 322.0}
+    labelcoords {271.0 354.0}
+    services {zebra OSPFv2 OSPFv3 IPForward}
+    interface-peer {eth0 n2}
+    interface-peer {eth1 n5}
+    interface-peer {eth2 n4}
+}
+
+node n2 {
+    type router
+    model router
+    network-config {
+	hostname n2
+	!
+	interface eth2
+	 ip address 10.0.4.1/24
+	 mac address 00:00:00:aa:00:08
+	!
+	interface eth1
+	 ip address 10.0.1.1/24
+	 mac address 00:00:00:aa:00:02
+	!
+	interface eth0
+	 ip address 10.0.0.2/24
+	 mac address 00:00:00:aa:00:01
+	!
+    }
+    canvas c1
+    iconcoords {484.0 152.0}
+    labelcoords {484.0 184.0}
+    services {zebra OSPFv2 OSPFv3 IPForward}
+    interface-peer {eth0 n1}
+    interface-peer {eth1 n3}
+    interface-peer {eth2 n6}
+}
+
+node n3 {
+    type router
+    model router
+    network-config {
+	hostname n3
+	!
+	interface eth2
+	 ip address 10.0.5.1/24
+	 mac address 00:00:00:aa:00:0a
+	!
+	interface eth1
+	 ip address 10.0.2.1/24
+	 mac address 00:00:00:aa:00:04
+	!
+	interface eth0
+	 ip address 10.0.1.2/24
+	 mac address 00:00:00:aa:00:03
+	!
+    }
+    canvas c1
+    iconcoords {704.0 319.0}
+    labelcoords {704.0 351.0}
+    services {zebra OSPFv2 OSPFv3 IPForward}
+    interface-peer {eth0 n2}
+    interface-peer {eth1 n4}
+    interface-peer {eth2 n7}
+}
+
+node n4 {
+    type router
+    model router
+    network-config {
+	hostname n4
+	!
+	interface eth2
+	 ip address 10.0.7.1/24
+	 mac address 00:00:00:aa:00:0e
+	!
+	interface eth1
+	 ip address 10.0.6.1/24
+	 mac address 00:00:00:aa:00:0c
+	!
+	interface eth0
+	 ip address 10.0.2.2/24
+	 mac address 00:00:00:aa:00:05
+	!
+    }
+    canvas c1
+    iconcoords {485.0 499.0}
+    labelcoords {485.0 531.0}
+    services {zebra OSPFv2 OSPFv3 IPForward}
+    interface-peer {eth0 n3}
+    interface-peer {eth1 n8}
+    interface-peer {eth2 n1}
+}
+
+node n5 {
+    type router
+    model host
+    network-config {
+	hostname PC1
+	!
+	interface eth0
+	 ip address 10.0.3.10/24
+	 mac address 00:00:00:aa:00:07
+	!
+    }
+    canvas c1
+    iconcoords {25.0 321.0}
+    labelcoords {25.0 353.0}
+    services {DefaultRoute SSH}
+    interface-peer {eth0 n1}
+}
+
+node n6 {
+    type router
+    model host
+    network-config {
+	hostname PC2
+	!
+	interface eth0
+	 ip address 10.0.4.10/24
+	 mac address 00:00:00:aa:00:09
+	!
+    }
+    canvas c1
+    iconcoords {483.0 29.0}
+    labelcoords {483.0 61.0}
+    services {DefaultRoute SSH}
+    interface-peer {eth0 n2}
+}
+
+node n7 {
+    type router
+    model host
+    network-config {
+	hostname PC3
+	!
+	interface eth0
+	 ip address 10.0.5.10/24
+	 mac address 00:00:00:aa:00:0b
+	!
+    }
+    canvas c1
+    iconcoords {938.0 316.0}
+    labelcoords {938.0 348.0}
+    services {DefaultRoute SSH}
+    interface-peer {eth0 n3}
+}
+
+node n8 {
+    type router
+    model host
+    network-config {
+	hostname PC4
+	!
+	interface eth0
+	 ip address 10.0.6.10/24
+	 mac address 00:00:00:aa:00:0d
+	!
+    }
+    canvas c1
+    iconcoords {486.0 634.0}
+    labelcoords {486.0 666.0}
+    services {DefaultRoute SSH}
+    interface-peer {eth0 n4}
+}
+
+link l1 {
+    nodes {n1 n2}
+    bandwidth 10000000
+}
+
+link l2 {
+    ber 1.0
+    delay 5000
+    nodes {n2 n3}
+    bandwidth 5000000
+}
+
+link l3 {
+    ber 5.0
+    delay 10000
+    nodes {n3 n4}
+    bandwidth 2000000
+}
+
+link l4 {
+    nodes {n1 n5}
+}
+
+link l5 {
+    nodes {n2 n6}
+}
+
+link l6 {
+    nodes {n3 n7}
+}
+
+link l7 {
+    nodes {n4 n8}
+}
+
+link l8 {
+    duplicate 10
+    ber 10.0
+    delay 20000
+    nodes {n4 n1}
+    bandwidth 1000000
+}
+
+canvas c1 {
+    name {Canvas1}
+}
+
+option global {
+    interface_names no
+    ip_addresses yes
+    ipv6_addresses yes
+    node_labels yes
+    link_labels yes
+    show_api no
+    background_images no
+    annotations yes
+    grid yes
+    traffic_start 0
+}
+
+option session {
+    controlnet=
+    controlnet0=
+    controlnet1=
+    controlnet2=
+    controlnet3=
+    controlnet_updown_script=
+    enablerj45=1
+    enablesdt=0
+    ovs=0
+    preservedir=0
+    sdturl=tcp://127.0.0.1:50000/
+}
+
