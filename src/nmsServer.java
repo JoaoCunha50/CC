@@ -1,41 +1,74 @@
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.io.*;
+import java.net.*;
+import java.time.LocalTime;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class nmsServer {
-    public static void main(String[] args) {
-        int port = 12345; // Porta do servidor
+    private ServerSocket serverSocket;
+    private ConcurrentHashMap<Integer, InetAddress> agentRegistry; // Estrutura de dados para armazenar os IDs e IPs dos agentes
+    private int agentCounter = 1;
 
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Servidor iniciado e aguardando conexão na porta " + port);
+    public nmsServer(int port) throws IOException {
+        this.serverSocket = new ServerSocket(port);
+        this.agentRegistry = new ConcurrentHashMap<>();
+    }
 
-            // Aguarda a conexão do cliente
-            Socket clientSocket = serverSocket.accept();
-            System.out.println("Cliente conectado: " + clientSocket.getInetAddress());
+    public void start() {
+        System.out.println("Servidor iniciado e aguardando conexões...");
+        while (true) {
+            try {
+                Socket socket = serverSocket.accept();
+                new Thread(() -> handleClient(socket)).start();
+            } catch (IOException e) {
+                System.out.println("Erro ao aceitar conexão: " + e.getMessage());
+            }
+        }
+    }
 
-            // Preparando para ler dados do cliente
-            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+    private void handleClient(Socket socket) {
+        try (ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
+             ObjectInputStream input = new ObjectInputStream(socket.getInputStream())) {
 
-            String receivedMessage;
-            while ((receivedMessage = in.readLine()) != null) {
-                System.out.println("Mensagem recebida do cliente: " + receivedMessage);
+            // Ler o pedido de registro do agente
+            NetTask task = (NetTask) input.readObject();
+            if (task.getType() == 1) {
+                int agentId = register(task.getSenderNode());
+                
+                NetTask ackTask = new NetTask(
+                        task.getUUID(),
+                        socket.getInetAddress(),
+                        task.getSenderNode(),
+                        NetTask.ACKNOWLEDGE, // Tipo ACKNOWLEDGE
+                        0, // Número de sequência
+                        1, // Tamanho da janela
+                        LocalTime.now(),
+                        0, // Offset
+                        Integer.toString(agentId).getBytes() // ID do agente como dados
+                );
 
-                // Responde ao cliente
-                out.println("Recebi a tua mensagem!");
-
-                // Quebra o loop se o cliente enviar "sair"
-                if ("sair".equalsIgnoreCase(receivedMessage)) {
-                    System.out.println("Cliente desconectado.");
-                    break;
-                }
+                output.writeObject(ackTask);
+                output.flush();
+                System.out.println("Agente registrado com sucesso. ID: " + agentId);
             }
 
-            clientSocket.close();
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println("Erro ao comunicar com o cliente: " + e.getMessage());
+        }
+    }
+
+    private int register(InetAddress agentAddress) {
+        int agentId = agentCounter++;
+        agentRegistry.put(agentId, agentAddress);
+        return agentId;
+    }
+
+    public static void main(String[] args) {
+        int porta = 12345;
+        try {
+            nmsServer server = new nmsServer(porta);
+            server.start();
+        } catch (IOException e) {
+            System.out.println("Erro ao iniciar o servidor: " + e.getMessage());
         }
     }
 }

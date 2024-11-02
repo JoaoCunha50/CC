@@ -48,7 +48,5 @@ public class NetTaskProtocol {
 
     public void setSshthresh(int sshthresh) {
         this.sshthresh = sshthresh;
-    }
-
-    
+    } 
 }
