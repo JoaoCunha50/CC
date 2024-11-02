@@ -5,7 +5,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class nmsServer {
     private ServerSocket serverSocket;
-    private ConcurrentHashMap<Integer, InetAddress> agentRegistry; // Estrutura de dados para armazenar os IDs e IPs dos agentes
+    private ConcurrentHashMap<Integer, InetAddress> agentRegistry; // Estrutura de dados para armazenar os IDs e IPs dos
+                                                                   // agentes
     private int agentCounter = 1;
 
     public nmsServer(int port) throws IOException {
@@ -27,13 +28,13 @@ public class nmsServer {
 
     private void handleClient(Socket socket) {
         try (ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
-             ObjectInputStream input = new ObjectInputStream(socket.getInputStream())) {
+                ObjectInputStream input = new ObjectInputStream(socket.getInputStream())) {
 
             // Ler o pedido de registro do agente
             NetTask task = (NetTask) input.readObject();
             if (task.getType() == 1) {
                 int agentId = register(task.getSenderNode());
-                
+
                 NetTask ackTask = new NetTask(
                         task.getUUID(),
                         socket.getInetAddress(),
@@ -52,6 +53,17 @@ public class nmsServer {
             }
 
         } catch (IOException | ClassNotFoundException e) {
+            System.out.println("Erro ao comunicar com o cliente: " + e.getMessage());
+        }
+    }
+
+    private void sendTasks(Socket socket) {
+        try (ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
+                ObjectInputStream input = new ObjectInputStream(socket.getInputStream())) {
+
+            // ler Json e enviar as tarefas aos agentes
+
+        } catch (IOException e) {
             System.out.println("Erro ao comunicar com o cliente: " + e.getMessage());
         }
     }
