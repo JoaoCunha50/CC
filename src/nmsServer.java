@@ -1,12 +1,17 @@
 import java.io.*;
 import java.net.*;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.json.simple.parser.ParseException;
+
+import PDU.NetTask;
+import parser.Json_parser;
 
 public class nmsServer {
     private ServerSocket serverSocket;
-    private ConcurrentHashMap<Integer, InetAddress> agentRegistry; // Estrutura de dados para armazenar os IDs e IPs dos
-                                                                   // agentes
+    private ConcurrentHashMap<Integer, InetAddress> agentRegistry;
     private int agentCounter = 1;
 
     public nmsServer(int port) throws IOException {
@@ -42,8 +47,6 @@ public class nmsServer {
                         NetTask.ACKNOWLEDGE, // Tipo ACKNOWLEDGE
                         0, // Número de sequência
                         1, // Tamanho da janela
-                        LocalTime.now(),
-                        0, // Offset
                         Integer.toString(agentId).getBytes() // ID do agente como dados
                 );
 
@@ -61,7 +64,16 @@ public class nmsServer {
         try (ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
                 ObjectInputStream input = new ObjectInputStream(socket.getInputStream())) {
 
-            // ler Json e enviar as tarefas aos agentes
+            Json_parser tasks = new Json_parser("../tasks.json");
+            HashMap<String, NetTask> tasksMap = new HashMap<>();
+            try {
+                tasksMap = tasks.tasks_parser();
+            } catch (ParseException e) {
+                e.printStackTrace();
+            }
+            NetTask task_to_send = tasksMap.get("1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p");
+            output.writeObject(task_to_send);
+            output.flush();
 
         } catch (IOException e) {
             System.out.println("Erro ao comunicar com o cliente: " + e.getMessage());

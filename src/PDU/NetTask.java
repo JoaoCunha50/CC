@@ -1,6 +1,7 @@
+package PDU;
+
 import java.io.*;
 import java.net.InetAddress;
-import java.time.*;
 
 public class NetTask implements Serializable {
     private static final byte[] TOKEN = ".@.".getBytes();
@@ -12,20 +13,17 @@ public class NetTask implements Serializable {
     private int type;
     private int seq_num;
     private int window_size;
-    private LocalTime timestamp;
     private int offset;
     private byte[] data;
 
     public NetTask(String UUID, InetAddress senderNode, InetAddress destinationNode, int type, int seq_num,
-            int window_size, LocalTime timestamp, int offset, byte[] data) {
+            int window_size, byte[] data) {
         this.UUID = UUID;
         this.senderNode = senderNode;
         this.destinationNode = destinationNode;
         this.type = type;
         this.seq_num = seq_num;
         this.window_size = window_size;
-        this.timestamp = timestamp;
-        this.offset = offset;
         this.data = data;
     }
 
@@ -97,10 +95,6 @@ public class NetTask implements Serializable {
         return window_size;
     }
 
-    public LocalTime getTimestamp() {
-        return timestamp;
-    }
-
     public void setSeq_num(int seq_num) {
         this.seq_num = seq_num;
     }
@@ -109,7 +103,4 @@ public class NetTask implements Serializable {
         this.window_size = window_size;
     }
 
-    public void setTimestamp(LocalTime timestamp) {
-        this.timestamp = timestamp;
-    }
 }

@@ -2,6 +2,8 @@ import java.io.*;
 import java.net.*;
 import java.time.LocalTime;
 
+import PDU.NetTask;
+
 public class nmsAgent {
     private Socket socket;
     private ObjectOutputStream output;
@@ -22,8 +24,6 @@ public class nmsAgent {
                     1, // Tipo de tarefa 1 para registro
                     0, // Número de sequência
                     1, // Tamanho da janela
-                    LocalTime.now(),
-                    0, // Offset
                     "Pedido de Registro".getBytes());
 
             // Enviar o pedido de registro
