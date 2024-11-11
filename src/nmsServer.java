@@ -37,22 +37,16 @@ public class nmsServer {
 
             // Ler o pedido de registro do agente
             NetTask task = (NetTask) input.readObject();
-            if (task.getType() == 1) {
-                int agentId = register(task.getSenderNode());
+            if (task.getType() == 0) {
+                int agentId = register(socket.getInetAddress());
 
                 NetTask ackTask = new NetTask(
                         task.getUUID(),
-                        socket.getInetAddress(),
-                        task.getSenderNode(),
-                        NetTask.ACKNOWLEDGE, // Tipo ACKNOWLEDGE
-                        0, // Número de sequência
-                        1, // Tamanho da janela
-                        Integer.toString(agentId).getBytes() // ID do agente como dados
-                );
+                        1);
 
                 output.writeObject(ackTask);
                 output.flush();
-                System.out.println("Agente registrado com sucesso. ID: " + agentId);
+                System.out.println("Agente registrado com sucesso. ID: " + agentId + "\nIP: " + socket.getInetAddress());
             }
 
         } catch (IOException | ClassNotFoundException e) {
@@ -65,7 +59,7 @@ public class nmsServer {
                 ObjectInputStream input = new ObjectInputStream(socket.getInputStream())) {
 
             Json_parser tasks = new Json_parser("../tasks.json");
-            HashMap<String, NetTask> tasksMap = new HashMap<>();
+            HashMap<Integer, NetTask> tasksMap = new HashMap<>();
             try {
                 tasksMap = tasks.tasks_parser();
             } catch (ParseException e) {

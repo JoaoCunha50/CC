@@ -19,12 +19,7 @@ public class nmsAgent {
         try {
             NetTask task = new NetTask(
                     java.util.UUID.randomUUID().toString(),
-                    InetAddress.getLocalHost(),
-                    socket.getInetAddress(),
-                    1, // Tipo de tarefa 1 para registro
-                    0, // Número de sequência
-                    1, // Tamanho da janela
-                    "Pedido de Registro".getBytes());
+                    0);
 
             // Enviar o pedido de registro
             output.writeObject(task);
@@ -34,8 +29,7 @@ public class nmsAgent {
             // Receber resposta do servidor
             NetTask response = (NetTask) input.readObject(); // Lê o objeto NetTask
             if (response.getType() == NetTask.ACKNOWLEDGE) {
-                int agenteId = Integer.parseInt(new String(response.getData()));
-                System.out.println("ACK recebido do servidor. Registro bem-sucedido! ID do agente recebido: " + agenteId);
+                System.out.println("ACK recebido do servidor. Registro bem-sucedido!\n IP server : " + socket.getInetAddress());
             }
 
         } catch (IOException | ClassNotFoundException e) {

@@ -1,29 +1,30 @@
 [
     {
-        "UUID": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
-        "senderNode": "192.168.1.1",
-        "destinationNode": "192.168.1.2",
+        "agent_id": 1,
         "type": 2,
-        "seq_num": 1,
-        "window_size": 1,
-        "data": "Tarefa de monitoramento da rede"
-    },
-    {
-        "UUID": "2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q",
-        "senderNode": "192.168.1.1",
-        "destinationNode": "192.168.1.3",
-        "type": 2,
-        "seq_num": 2,
-        "window_size": 1,
-        "data": "Tarefa de teste de latência"
-    },
-    {
-        "UUID": "3c4d5e6f-7g8h-9i0j-1k2l-3m4n5o6p7q8r",
-        "senderNode": "192.168.1.1",
-        "destinationNode": "192.168.1.4",
-        "type": 2,
-        "seq_num": 3,
-        "window_size": 1,
-        "data": "Tarefa de atualização de software"
+        "data": {
+            "task_type": 0,
+            "frequency": 20,
+            "devices": [
+                {
+                    "device_metrics": {
+                        "cpu_usage": true,
+                        "ram_usage": true,
+                        "interface_stats": [
+                            "eth0",
+                            "eth1",
+                            "eth2"
+                        ]
+                    },
+                    "alertflow_conditions": {
+                        "cpu_usage": 80,
+                        "ram_usage": 90,
+                        "interface_stats": 2000,
+                        "packet_loss": 5,
+                        "jitter": 100
+                    }
+                }
+            ]
+        }
     }
 ]
