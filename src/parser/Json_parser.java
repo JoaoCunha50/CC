@@ -40,7 +40,7 @@ public class Json_parser {
                 int type = ((Long) taskJson.get("type")).intValue();
                 byte[] data = ((String) taskJson.get("data")).getBytes(); // Convertendo a string em bytes
 
-                NetTask task = new NetTask(UUID, type, data);
+                NetTask task = new NetTask();
 
                 // Adicionando a tarefa ao HashMap usando UUID como chave
                 tasksMap.put(agent_id, task);
