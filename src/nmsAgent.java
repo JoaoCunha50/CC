@@ -80,8 +80,8 @@ public void receiveTasks() {
 
         System.out.println("Aguardando tarefas...");
         
-        while (true) { // Loop infinito para ficar esperando dados
-            if (input.available() > 0) { // Verifica se há dados disponíveis no stream
+        while (true) { // Loop infinito para ficar a espera de dados
+            if (input.available() > 0) { // Verifica se há dados disponíveis na stream
                 byte[] defaultBuffer = new byte[100];
                 int bytesRead = input.read(defaultBuffer);
                 System.out.println("Li estes bytes: " + bytesRead);
