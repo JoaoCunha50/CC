@@ -74,67 +74,54 @@ public class nmsAgent {
         }
     }
 
-    public void receiveTasks() {
-        try (DataOutputStream output = new DataOutputStream(socket.getOutputStream());
-                DataInputStream input = new DataInputStream(socket.getInputStream())) {
+public void receiveTasks() {
+    try (DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+         DataInputStream input = new DataInputStream(socket.getInputStream())) {
 
-            byte[] defaultBuffer = new byte[100];
-            int bytesRead = input.read(defaultBuffer);
-            System.out.println(Arrays.toString(defaultBuffer));
+        System.out.println("Aguardando tarefas...");
+        
+        while (true) { // Loop infinito para ficar esperando dados
+            if (input.available() > 0) { // Verifica se há dados disponíveis no stream
+                byte[] defaultBuffer = new byte[100];
+                int bytesRead = input.read(defaultBuffer);
+                System.out.println("Li estes bytes: " + bytesRead);
+
+                if (bytesRead > 0) {
+                    // Processa os dados recebidos
+                    byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 38);
+
+                    String bufferPayloadData = new String(bufferTemp, StandardCharsets.UTF_8);
+                    int taskType = Byte.toUnsignedInt(bufferTemp[37]);
+                    System.out.println(taskType + " é este tipo de task");
+
+                    int payloadLength = 0;
+                    switch (taskType) {
+                        case 0: payloadLength = 2; break;
+                        case 1: payloadLength = 2; break;
+                        case 2: payloadLength = 9; break;
+                        case 3: payloadLength = 9; break;
+                        case 4: payloadLength = 5; break;
+                    }
+
+                    byte[] bufferPayload = Arrays.copyOfRange(defaultBuffer, 38, 38 + payloadLength);
+                    byte[] pduUUIDBytes = Arrays.copyOfRange(bufferTemp, 0, 36);
+                    String pduUUID = new String(pduUUIDBytes, StandardCharsets.UTF_8);
+                    int freq = Byte.toUnsignedInt(bufferPayload[0]);
+                    int threshold = Byte.toUnsignedInt(bufferPayload[1]);
+
+                   System.out.println("Recebi uma task do tipo: " + taskType + " com UUID: " + pduUUID);
+                   System.out.println("Recebi uma task c/ freq: " + freq + " e com threshold: " + threshold);
 
 
-
-            byte[] bufferTemp = new byte[38];
-            bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 38);
-
-            String bufferPayloadData = new String(bufferTemp,StandardCharsets.UTF_8);
-            //System.out.println(bufferPayloadData);
-            //int bytesRead = input.read(bufferTemp);
-            int taskType = Byte.toUnsignedInt(bufferTemp[37]);
-            System.out.println(taskType + "é este tipo de task");
-            int payloadLength = 0;
-            switch (taskType) {
-                case 0:
-                    payloadLength = 2;
-                    break;
-                case 1:
-                    payloadLength = 2;
-                    break;
-                case 2:
-                    payloadLength = 9;
-                    break;
-                case 3:
-                    payloadLength = 9;
-                    break;
-                case 4:
-                    payloadLength = 5;
-                    break;
+            } else {
+                Thread.sleep(100); 
             }
-
-            byte[] bufferPayload = new byte[payloadLength];
-            bufferPayload = Arrays.copyOfRange(defaultBuffer, 38, 38 + payloadLength);
-
-            byte[] headerBuffer = Arrays.copyOfRange(bufferTemp, 0, 38); // neste momento contém o campo taskType
-            byte[] pduUUIDBytes = Arrays.copyOfRange(headerBuffer, 0, 36);
-            String pduUUID = new String(pduUUIDBytes, StandardCharsets.UTF_8);
-            int type = Byte.toUnsignedInt(headerBuffer[36]);
-
-            int freq = Byte.toUnsignedInt(defaultBuffer[1]);
-            int threshold = Byte.toUnsignedInt(defaultBuffer[2]);
-            System.out.println(pduUUID);
-
-            if (bytesRead > 0) {
-                System.out.println("Recebi uma task do tipo: " + taskType + " com um payload Lenght de " + payloadLength
-                + " e com a freq de " + freq + " e o threshold de " + threshold);
-            } else{
-                System.out.println("Não chegou nada sócio");
-            }
-  
-
-        } catch (IOException e) {
-            System.out.println("Erro ao receber a task: " + e.getMessage());
         }
     }
+    } catch (IOException | InterruptedException e) {
+        System.out.println("Erro ao receber a task: " + e.getMessage());
+    }
+}
 
     public void closeConnection() {
         try {
