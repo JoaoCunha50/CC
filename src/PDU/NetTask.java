@@ -3,8 +3,11 @@ package PDU;
 import java.io.*;
 import java.net.InetAddress;
 import java.util.UUID;
-import java.nio.ByteBuffer;
 
+import javax.print.DocFlavor.STRING;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 public class NetTask implements Serializable {
 
@@ -18,15 +21,15 @@ public class NetTask implements Serializable {
         String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
         int type = REGISTER;
 
-        byte type_byte = (byte)type;
+        byte type_byte = (byte) type;
         byte[] uuidBytes = uuid.getBytes();
-        
+
         // Criar um ByteBuffer para conter o tipo e o UUID
         ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 1); // 4 bytes para o int e o restante para o
         // UUID
         buffer.put(uuidBytes); // Coloca os bytes do UUID no buffer
         buffer.put(type_byte); // Coloca o tipo (int) no buffer
-        
+
         byte[] registerPDU = buffer.array(); // Obter o array de bytes
 
         return registerPDU;
@@ -50,29 +53,26 @@ public class NetTask implements Serializable {
         return ackPDU;
     }
 
-    public byte[] createTaskPDU(int taskType,int freq,int threshold, InetAddress source,InetAddress destination, String interfaceName){
-        byte[] taskPDU = null;
-        switch(taskType){
+    public byte[] createTaskPDU(int taskType, int freq, int threshold, InetAddress source, InetAddress destination,
+            String interfaceName) {
+        switch (taskType) {
             case 0: // CPU Task
-                taskPDU = createCPUtask(freq,threshold);
-                break;
+                return createCPUtask(freq, threshold);
             case 1: // RAM Task
-                taskPDU = createRAMtask(freq,threshold);
-                break;
-            case 2: // Latencia Task
-                taskPDU = createLatencyTask(freq,threshold,source,destination);
-                break;
+                return createRAMtask(freq, threshold);
+            case 2: // Latency Task
+                return createLatencyTask(freq, threshold, source, destination);
             case 3: // Throughput Task
-                taskPDU = createThroughputTask(freq,threshold,source,destination);
-                break;
+                return createThroughputTask(freq, threshold, source, destination);
             case 4: // Interface Task
-                taskPDU = createInterfaceTask(freq,threshold,interfaceName);
-                break;
+                return createInterfaceTask(freq, threshold, interfaceName);
+            default:
+                // Return null or some default value if taskType doesn't match any case
+                throw new IllegalArgumentException("Invalid task type: " + taskType);
         }
-        return taskPDU;
     }
 
-    public byte[] createCPUtask(int freq, int threshold){
+    public byte[] createCPUtask(int freq, int threshold) {
         String uuid = UUID.randomUUID().toString();
         int type = TASK;
         int taskType = 0; // definido anteriormente
@@ -81,9 +81,10 @@ public class NetTask implements Serializable {
         byte type_byte = (byte) type;
         byte taskType_byte = (byte) taskType;
         byte freq_byte = (byte) freq;
+        System.out.println("criando task com uuid de " + new String(uuidBytes,StandardCharsets.UTF_8));
         byte threshold_byte = (byte) threshold;
 
-        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 4);
+        ByteBuffer buffer = ByteBuffer.allocate(40);
 
         buffer.put(uuidBytes);
         buffer.put(type_byte);
@@ -92,11 +93,14 @@ public class NetTask implements Serializable {
         buffer.put(threshold_byte);
 
         byte[] cpuTaskPDU = buffer.array();
+        /*String teste = new String(cpuTaskPDU,StandardCharsets.UTF_8);
+        String uuidteste = new String(uuidBytes,StandardCharsets.UTF_8);
+        System.out.println("É ISTO-> " + teste + " e tem este id -> " + uuidteste);*/
 
         return cpuTaskPDU;
     }
 
-    public byte[] createRAMtask(int freq, int threshold){
+    public byte[] createRAMtask(int freq, int threshold) {
         String uuid = UUID.randomUUID().toString();
         int type = TASK;
         int taskType = 1; // definido anteriormente
@@ -120,7 +124,7 @@ public class NetTask implements Serializable {
         return ramTaskPDU;
     }
 
-    public byte[] createLatencyTask(int freq, int threshold,InetAddress source, InetAddress dest){
+    public byte[] createLatencyTask(int freq, int threshold, InetAddress source, InetAddress dest) {
         String uuid = UUID.randomUUID().toString();
         int type = TASK;
         int taskType = 2; // definido anteriormente
@@ -133,7 +137,6 @@ public class NetTask implements Serializable {
         byte[] sourceBytes = source.getAddress();
         byte[] destBytes = dest.getAddress();
 
-
         ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 12);
 
         buffer.put(uuidBytes);
@@ -149,7 +152,7 @@ public class NetTask implements Serializable {
         return latencyTaskPDU;
     }
 
-    public byte[] createThroughputTask(int freq, int threshold,InetAddress source, InetAddress dest){
+    public byte[] createThroughputTask(int freq, int threshold, InetAddress source, InetAddress dest) {
         String uuid = UUID.randomUUID().toString();
         int type = TASK;
         int taskType = 3; // definido anteriormente
@@ -162,7 +165,6 @@ public class NetTask implements Serializable {
         byte[] sourceBytes = source.getAddress();
         byte[] destBytes = dest.getAddress();
 
-
         ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 12);
 
         buffer.put(uuidBytes);
@@ -178,7 +180,7 @@ public class NetTask implements Serializable {
         return latencyTaskPDU;
     }
 
-    public byte[] createInterfaceTask(int freq, int threshold,String interfaceName){
+    public byte[] createInterfaceTask(int freq, int threshold, String interfaceName) {
         String uuid = UUID.randomUUID().toString();
         int type = TASK;
         int taskType = 4; // definido anteriormente
@@ -189,7 +191,6 @@ public class NetTask implements Serializable {
         byte freq_byte = (byte) freq;
         byte threshold_byte = (byte) threshold;
         byte[] interfaceBytes = interfaceName.getBytes();
-
 
         ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 8);
 

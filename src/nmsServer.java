@@ -1,8 +1,11 @@
 import java.io.*;
 import java.net.*;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.json.simple.parser.ParseException;
 
@@ -13,6 +16,8 @@ public class nmsServer {
     private ServerSocket serverSocket;
     private ConcurrentHashMap<Integer, InetAddress> agentRegistry;
     private int agentCounter = 1;
+    private final ReentrantLock lock = new ReentrantLock();  // Lock to control thread execution order
+
 
     public nmsServer(int port) throws IOException {
         this.serverSocket = new ServerSocket(port);
@@ -24,7 +29,8 @@ public class nmsServer {
         while (true) {
             try {
                 Socket socket = serverSocket.accept();
-                new Thread(() -> handleClient(socket)).start();
+                //new Thread(() -> handleClient(socket)).start();
+                new Thread(() -> sendTasks(socket)).start();
             } catch (IOException e) {
                 System.out.println("Erro ao aceitar conexão: " + e.getMessage());
             }
@@ -67,19 +73,33 @@ public class nmsServer {
     }
 
     private void sendTasks(Socket socket) {
-        try (ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
-                ObjectInputStream input = new ObjectInputStream(socket.getInputStream())) {
+        try (DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+             DataInputStream input = new DataInputStream(socket.getInputStream())) {
 
-            Json_parser tasks = new Json_parser("../tasks.json");
-            HashMap<Integer, NetTask> tasksMap = new HashMap<>();
+            Json_parser tasks = new Json_parser("src/tasks.json");
+            HashMap<Integer, byte[]> tasksMap = new HashMap<>();
             try {
                 tasksMap = tasks.tasks_parser();
             } catch (ParseException e) {
                 e.printStackTrace();
             }
-            NetTask task_to_send = tasksMap.get("1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p");
-            output.writeObject(task_to_send);
-            output.flush();
+            
+
+
+            for(Map.Entry<Integer,byte[]> entry : tasksMap.entrySet()){
+                int agentID = entry.getKey(); // obter o agentID das tasks
+                System.out.println("É para este->" + entry.getKey() + " " + entry.getValue());
+
+                if (!agentRegistry.containsKey(agentID)) { // verificar se o agente já foi registado
+                    // enviar a task para o agente
+                    byte[] taskPDU = entry.getValue();
+                    System.out.println(Arrays.toString(taskPDU));
+                    output.write(taskPDU);
+                    output.flush();
+                } else {
+                    System.out.println("Agente com o ID " + agentID + "não foi registado" );
+                }
+            }
 
         } catch (IOException e) {
             System.out.println("Erro ao comunicar com o cliente: " + e.getMessage());

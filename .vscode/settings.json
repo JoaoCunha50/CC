@@ -2,5 +2,6 @@
     "java.project.referencedLibraries": [
         "lib/**/*.jar",
         "dependencies/json-simple-1.1.1.jar"
-    ]
+    ],
+    "java.format.settings.url": "eclipse-formatter.xml"
 }

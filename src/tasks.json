@@ -4,7 +4,7 @@
         "type": 2,
         "data": {
             "task_type": 0,
-            "frequency": 20,
+            "frequency": 100,
             "devices": [
                 {
                     "device_metrics": {
