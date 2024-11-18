@@ -1,2 +1,2 @@
 # CC
-Comunicações por. 
+Comunicações por computadores
