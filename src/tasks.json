@@ -3,7 +3,7 @@
         "agent_id": 1,
         "type": 2,
         "data": {
-            "task_type": 0,
+            "task_type": 2,
             "frequency": 100,
             "devices": [
                 {

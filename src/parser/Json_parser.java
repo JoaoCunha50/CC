@@ -45,7 +45,6 @@ public class Json_parser {
                 JSONObject dataJson = (JSONObject) taskJson.get("data");
                 int task_type = ((Long) dataJson.get("task_type")).intValue();
                 int frequency = ((Long) dataJson.get("frequency")).intValue();
-                System.out.println(frequency);
 
                 // Extraindo a lista de `devices`
                 JSONArray devicesArray = (JSONArray) dataJson.get("devices");
