@@ -3,7 +3,10 @@ import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Arrays;
 import org.json.simple.parser.ParseException;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import PDU.NetTask;
 import parser.Json_parser;
@@ -12,14 +15,46 @@ public class nmsServer {
     private DatagramSocket socket;
     private ConcurrentHashMap<Integer, InetSocketAddress> agentRegistry;
     private int agentCounter = 1;
+    private final static int port = 12345;
+    private HashMap<Integer, byte[]> tasksMap;
 
-    public nmsServer(int port) throws IOException {
+    public nmsServer() throws IOException {
         this.socket = new DatagramSocket(port);
+        socket.setSoTimeout(5000); // Tempo limite de 5 segundos
         this.agentRegistry = new ConcurrentHashMap<>();
+
+        Json_parser tasks = new Json_parser("src/tasks.json");
+        this.tasksMap = new HashMap<>();
+        try {
+            tasksMap = tasks.tasks_parser();
+        } catch (ParseException e) {
+            System.out.println("Error processing JSON File: " + e.getMessage());
+            e.printStackTrace();
+            return; // Interrompe o envio de tarefas se o JSON estiver inválido
+        }
+    }
+
+    private void sendPacket(byte[] data, InetSocketAddress clientAddress) throws IOException {
+        DatagramPacket packet = new DatagramPacket(data, data.length, clientAddress.getAddress(),
+                clientAddress.getPort());
+        socket.send(packet);
+    }
+
+    public byte[] receivePacket() throws IOException {
+        byte[] buffer = new byte[1024];
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+
+        try {
+            socket.receive(packet); // Aguarda o pacote
+            return Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
+        } catch (SocketTimeoutException e) {
+            System.out.println("[TIMEOUT] Nenhuma resposta recebida dentro do tempo limite.");
+            return null; // Retorna nulo se o tempo esgotar
+        }
     }
 
     public void start() {
-        System.out.println("Servidor iniciado e aguardando pacotes...");
+        System.out.println("Server started, waiting for packets...");
         byte[] buffer = new byte[1024];
 
         while (true) {
@@ -27,10 +62,8 @@ public class nmsServer {
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 socket.receive(packet);
 
-                new Thread(() -> handleClient(packet)).start();
-                //new Thread(() -> sendTasks()).start();
+                handleClient(packet);
             } catch (IOException e) {
-                System.out.println("Erro ao receber pacote: " + e.getMessage());
             }
         }
     }
@@ -43,72 +76,75 @@ public class nmsServer {
 
             if (type == NetTask.REGISTER) {
                 int agentId = register(clientAddress);
-                NetTask handler = new NetTask();
-                byte[] ackPDU = handler.createAckPDU();
 
-                sendPacket(ackPDU, clientAddress);
-                System.out.println("Agente registrado. ID: " + agentId + " IP: " + clientAddress);
-                sendTasks();
+                System.out.println(
+                        "[REGISTER RECEIVED] Agent registered successfully\nID: " + agentId + "\nIP: "
+                                + clientAddress);
+                if (agentId != -1) {
+                    NetTask handler = new NetTask();
+                    byte[] ackPDU = handler.createAckPDU();
+
+                    sendPacket(ackPDU, clientAddress);
+                    System.out.println(
+                        "[ACK SENT] REGISTER ACKOWLEDGEMENT sent");
+                }
             }
         } catch (IOException e) {
-            System.out.println("Erro ao processar cliente: " + e.getMessage());
+            System.out.println("Error Processing Client: " + e.getMessage());
         }
+        sendTasks();
     }
 
     private void sendTasks() {
         try {
-            Json_parser tasks = new Json_parser("src/tasks.json");
-            HashMap<Integer, byte[]> tasksMap = new HashMap<>();
-
-            try {
-                tasksMap = tasks.tasks_parser();
-            } catch (ParseException e) {
-                System.out.println("Erro ao processar o arquivo JSON: " + e.getMessage());
-                e.printStackTrace();
-                return; // Interrompe o envio de tarefas se o JSON estiver inválido
-            }
-
             for (Map.Entry<Integer, byte[]> entry : tasksMap.entrySet()) {
                 int agentID = entry.getKey();
                 byte[] taskPDU = entry.getValue();
 
                 if (agentRegistry.containsKey(agentID)) {
                     InetSocketAddress clientAddress = agentRegistry.get(agentID);
-
                     sendPacket(taskPDU, clientAddress);
-                    System.out.println("Task enviada para o agente ID " + agentID);
+                    System.out.println("[TASK SENT] Task sent to agent " + agentID);
 
+                    boolean ackReceived = false;
+                    while (!ackReceived) {
+                        byte[] response = receivePacket(); // Recebe o pacote
+                        if (response != null && response.length > 0) {
+                            byte type = response[response.length - 1];
+                            int typeInt = Byte.toUnsignedInt(type);
+                            if (typeInt == NetTask.ACKNOWLEDGE) {
+                                ackReceived = true;
+                                System.out.println("[ACK RECEIVED] ACK received. Operation successful.\n");
+                            }
+                        }
+                    }
                     // Após enviar a task com sucesso, remove a task do mapa
                     tasksMap.remove(agentID);
-                    System.out.println("Task removida do mapa para o agente ID " + agentID);
                 } else {
-                    System.out.println("Agente " + agentID + " não registrado.");
+                    System.out.println("Agent " + agentID + " is not registered.");
                 }
             }
         } catch (IOException e) {
-            System.out.println("Erro ao enviar tarefas: " + e.getMessage());
+            System.out.println("Error sending tasks: " + e.getMessage());
         }
     }
 
-    private void sendPacket(byte[] data, InetSocketAddress clientAddress) throws IOException {
-        DatagramPacket packet = new DatagramPacket(data, data.length, clientAddress.getAddress(),
-                clientAddress.getPort());
-        socket.send(packet);
-    }
-
     private int register(InetSocketAddress clientAddress) {
-        int agentId = agentCounter++;
-        agentRegistry.put(agentId, clientAddress);
-        return agentId;
+        if (!agentRegistry.containsValue(clientAddress)) { // Verifica se o agente já está registrado
+            int agentId = agentCounter++;
+            agentRegistry.put(agentId, clientAddress); // Adiciona o novo agente ao registro
+            return agentId; // Retorna o ID atribuído ao agente
+        } else {
+            return -1;
+        }
     }
 
     public static void main(String[] args) {
-        int port = 12345;
         try {
-            nmsServer server = new nmsServer(port);
+            nmsServer server = new nmsServer();
             server.start();
         } catch (IOException e) {
-            System.out.println("Erro ao iniciar o servidor: " + e.getMessage());
+            System.out.println("Error starting the server: " + e.getMessage());
         }
     }
 }

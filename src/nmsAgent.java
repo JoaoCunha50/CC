@@ -34,7 +34,7 @@ public class nmsAgent {
             NetTask handler = new NetTask();
             byte[] registerPDU = handler.createRegisterPDU();
             sendByteArray(registerPDU);
-            System.out.println("Pedido de registro enviado.");
+            System.out.println("[REGISTER SENT] Register PDU sent.");
 
             // Receber resposta
             byte[] response = receiveByteArray();
@@ -42,24 +42,24 @@ public class nmsAgent {
             int typeInt = Byte.toUnsignedInt(type);
 
             if (typeInt == NetTask.ACKNOWLEDGE) {
-                System.out.println("[ACK] ACK recebido. Registro bem-sucedido.");
-            } else {
-                System.out.println("Registro falhou. Tipo recebido: " + typeInt);
+                System.out.println("[ACK RECEIVED] ACK received. Register successfull.\n");
             }
         } catch (IOException e) {
-            System.out.println("Erro ao registrar: " + e.getMessage());
+            System.out.println("[REGISTER TIMEOUT] Register Failed. Re-sending...\n");
         }
     }
 
     public void receiveTasks() {
         try {
-            System.out.println("Aguardando por tarefas...");
+            System.out.println("Waiting for tasks...");
 
             while (true) { // Loop infinito para ficar a espera de dados
+                NetTask handler = new NetTask();
                 byte[] defaultBuffer = receiveByteArray();
                 int bytesRead = defaultBuffer.length;
 
                 if (bytesRead > 0) {
+
                     // Processa os dados recebidos
                     byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 38);
 
@@ -90,39 +90,43 @@ public class nmsAgent {
                     int freq = Byte.toUnsignedInt(bufferPayload[0]);
                     int threshold = Byte.toUnsignedInt(bufferPayload[1]);
 
-                    System.out.println("Recebi uma task do tipo: " + taskType + " com UUID: " + pduUUID);
-                    System.out.println("Recebi uma task c/ freq: " + freq + " e com threshold: " + threshold);
+                    System.out.println("[TASK RECEIVED] Task received: ");
+                    System.out.println("Task_type: " + taskType + "\nUUID: " + pduUUID);
+                    System.out.println("Frequency: " + freq + "\nthreshold: " + threshold);
+                    System.out.println();
+
+                    byte[] ackPDU = handler.createAckPDU();
+                    sendByteArray(ackPDU);
+                    System.out.println("[ACK SENT] Task Received, sending ACK");
 
                 } else {
                     Thread.sleep(100);
                 }
+
             }
         } catch (IOException | InterruptedException e) {
-            System.out.println("Erro ao receber tarefas: " + e.getMessage());
+            System.out.println("Error receiving tasks: " + e.getMessage());
         }
     }
 
     public void closeConnection() {
         if (socket != null) {
             socket.close();
-            System.out.println("Conexão terminada\n");
         }
     }
-    
 
     public static void main(String[] args) {
-        String servidorIP = "127.0.0.1";
         int porta = 12345;
 
         try {
-            nmsAgent agente = new nmsAgent(servidorIP, porta);
+            nmsAgent agente = new nmsAgent(args[0], porta);
             agente.register();
             agente.receiveTasks();
 
             Scanner scanner = new Scanner(System.in);
             String comando;
 
-            System.out.println("Pressione 'q' para sair e fechar a conexão.");
+            System.out.println("Press 'q' to close the connection.");
 
             // Loop que aguarda a entrada do usuário
             while (true) {
@@ -131,7 +135,7 @@ public class nmsAgent {
 
                 // Verifica se o usuário digitou 'q' para fechar a conexão
                 if (comando.equalsIgnoreCase("q")) {
-                    System.out.println("Fechando a conexão...");
+                    System.out.println("Closing connection");
                     agente.closeConnection();
                     break; // Encerra o loop e termina o programa
                 }
