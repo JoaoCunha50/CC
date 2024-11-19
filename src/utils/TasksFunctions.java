@@ -36,7 +36,7 @@ public class TasksFunctions {
         cpuUsage = Math.round(cpuUsage * 100.0) / 100.0;
 
         // Exibe o valor formatado
-        System.out.println("Uso da CPU: " + cpuUsage + "%");
+        System.out.println("CPU Use: " + cpuUsage + "%");
 
         return cpuUsage;
     }
@@ -52,7 +52,7 @@ public class TasksFunctions {
         double usedMemory = ((double) (totalMemory - freeMemory) / totalMemory) * 100;
         // Arredonda para duas casas decimais
         usedMemory = Math.round(usedMemory * 100.0) / 100.0;
-        System.out.println("Uso da RAM: " + usedMemory + "%");
+        System.out.println("RAM Use: " + usedMemory + "%");
 
         return usedMemory;
     }
@@ -117,5 +117,4 @@ public class TasksFunctions {
         measureRAMusage();
         pingTask("google.com");
     }
-
 }

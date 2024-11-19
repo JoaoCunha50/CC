@@ -42,7 +42,11 @@ clean:
 
 # Run the program
 agent:
-	java -cp "$(BIN_DIR):$(LIBRARY)" nmsAgent
+	@if [ -z "$(IP)" ]; then \
+		echo "Usage: make agent IP=<server_ip>"; \
+	else \
+		java -cp "$(BIN_DIR):$(LIBRARY)" nmsAgent $(IP); \
+	fi
 
 server:
 	java -cp "$(BIN_DIR):$(LIBRARY)" nmsServer
