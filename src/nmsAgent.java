@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import utils.TasksHandler;
 import PDU.NetTask;
 
 public class nmsAgent {
@@ -109,12 +110,35 @@ public class nmsAgent {
                             retries++;
                         }
                     }
+
+                        NetTask handlerPDU = new NetTask();
+                        double taskOutput = -1;
+                        taskOutput = executeTasks(taskType, freq);
+                        if (taskOutput > threshold) {
+                            // enviar o alertflow
+                        } else {
+                            handlerPDU.createOutput();
+                        }                    
                 } else {
                     Thread.sleep(100);
                 }
             }
         } catch (IOException | InterruptedException e) {
             System.out.println("Error receiving tasks: " + e.getMessage());
+        }
+    }
+
+    public double executeTasks(int taskType, int frequency) throws InterruptedException {
+        TasksHandler execute = new TasksHandler();
+        double output = -1;
+        output = execute.handleTasks(taskType, frequency, "");
+        return output;
+    }
+
+    public void closeConnection() {
+        if (socket != null) {
+            socket.close();
+            System.out.println("Conexão terminada\n");
         }
     }
 

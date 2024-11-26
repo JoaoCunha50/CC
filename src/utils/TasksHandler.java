@@ -6,7 +6,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
 
-public class TasksFunctions {
+public class TasksHandler {
 
     public double handleTasks(int task, int frequency, String ip) throws InterruptedException {
         double output = 0;
@@ -39,6 +39,37 @@ public class TasksFunctions {
         System.out.println("CPU Use: " + cpuUsage + "%");
 
         return cpuUsage;
+    }
+
+    public static void measureCPUusage2() {
+        try {
+            // Define the command to get CPU usage
+            String command = "mpstat 1 1 | awk '/all/ {print 100 - $12}'";
+
+            // Run the command
+            Process process = Runtime.getRuntime().exec(new String[] { "bash", "-c", command });
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+            // Read the output
+            String line;
+            double cpuUsage = -1.0; // Initialize with a default value
+            while ((line = reader.readLine()) != null) {
+                if (!line.trim().isEmpty()) {
+                    // Parse the output into a double
+                    cpuUsage = Double.parseDouble(line.trim());
+                    System.out.println("CPU Usage: " + cpuUsage + "%");
+                }
+            }
+
+            // Wait for the process to complete
+            process.waitFor();
+
+            // If needed, you can use the cpuUsage value here
+            System.out.println("Parsed CPU Usage Value: " + cpuUsage);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public static double measureRAMusage() throws InterruptedException {
@@ -94,7 +125,7 @@ public class TasksFunctions {
         return latency;
     }
 
-    private static double extractLatency(Boolean machine, String line) { // SÓ FUNCIONA PARA MÁQUINAS LINUX (!!!!)
+    private static double extractLatency(Boolean machine, String line) {
         String[] parts = null;
         String avg = "";
 
@@ -113,7 +144,7 @@ public class TasksFunctions {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        measureCPUusage(2);
+        measureCPUusage2();
         measureRAMusage();
         pingTask("google.com");
     }
