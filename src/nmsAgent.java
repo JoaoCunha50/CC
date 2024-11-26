@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Scanner;
 
+import utils.TasksHandler;
 import PDU.NetTask;
 
 public class nmsAgent {
@@ -93,6 +94,16 @@ public class nmsAgent {
                     System.out.println("Recebi uma task do tipo: " + taskType + " com UUID: " + pduUUID);
                     System.out.println("Recebi uma task c/ freq: " + freq + " e com threshold: " + threshold);
 
+
+                    NetTask handlerPDU = new NetTask();
+                    double taskOutput = -1;
+                    taskOutput = executeTasks(taskType, freq);
+                    if (taskOutput > threshold) {
+                        // enviar o alertflow
+                    } else {
+                        handlerPDU.createOutput();
+                    }
+
                 } else {
                     Thread.sleep(100);
                 }
@@ -102,13 +113,19 @@ public class nmsAgent {
         }
     }
 
+    public double executeTasks(int taskType, int frequency) throws InterruptedException {
+        TasksHandler execute = new TasksHandler();
+        double output = -1;
+        output = execute.handleTasks(taskType, frequency, "");
+        return output;
+    }
+
     public void closeConnection() {
         if (socket != null) {
             socket.close();
             System.out.println("Conexão terminada\n");
         }
     }
-    
 
     public static void main(String[] args) {
         String servidorIP = "127.0.0.1";
