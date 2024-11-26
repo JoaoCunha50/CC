@@ -94,7 +94,6 @@ public class nmsAgent {
                     System.out.println("Recebi uma task do tipo: " + taskType + " com UUID: " + pduUUID);
                     System.out.println("Recebi uma task c/ freq: " + freq + " e com threshold: " + threshold);
 
-
                     NetTask handlerPDU = new NetTask();
                     double taskOutput = -1;
                     taskOutput = executeTasks(taskType, freq);

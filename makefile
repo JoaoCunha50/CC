@@ -8,8 +8,9 @@ LIBRARY = $(LIB_DIR)/json-simple-1.1.1.jar
 SOURCES = $(SRC_DIR)/parser/Json_parser.java \
           $(SRC_DIR)/PDU/NetTask.java \
           $(SRC_DIR)/PDU/AlertFlow.java \
+		  $(SRC_DIR)/utils/TasksHandler.java \
           $(SRC_DIR)/nmsAgent.java \
-          $(SRC_DIR)/nmsServer.java
+          $(SRC_DIR)/nmsServer.java 
 
 # Output class files
 CLASSES = $(BIN_DIR)/AlertFlow.class \
@@ -30,7 +31,7 @@ $(BIN_DIR)/AlertFlow.class: $(SRC_DIR)/PDU/AlertFlow.java
 
 $(BIN_DIR)/nmsAgent.class: $(SRC_DIR)/nmsAgent.java
 	@mkdir -p $(BIN_DIR)
-	$(JAVAC) $(DIRFLAGS) $(SRC_DIR)/nmsAgent.java $(SRC_DIR)/PDU/NetTask.java
+	$(JAVAC) $(DIRFLAGS) $(SRC_DIR)/nmsAgent.java $(SRC_DIR)/PDU/NetTask.java $(SRC_DIR)/utils/TasksHandler.java
 
 $(BIN_DIR)/nmsServer.class: $(SRC_DIR)/nmsServer.java
 	@mkdir -p $(BIN_DIR)
