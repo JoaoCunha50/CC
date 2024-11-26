@@ -3,8 +3,8 @@
         "agent_id": 1,
         "type": 2,
         "data": {
-            "task_type": 2,
-            "frequency": 100,
+            "task_type": 0,
+            "frequency": 1,
             "devices": [
                 {
                     "device_metrics": {

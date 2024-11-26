@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import utils.TasksHandler;
+import utils.*;
 import PDU.NetTask;
 
 public class nmsAgent {
@@ -36,15 +36,17 @@ public class nmsAgent {
     public void register() {
         try {
             NetTask handler = new NetTask();
-            byte[] registerPDU = handler.createRegisterPDU();
+            byte[] registerPDU = handler.createRegisterPDU(1);
             sendByteArray(registerPDU);
             System.out.println("[REGISTER SENT] Register PDU sent.");
 
             // Receber resposta
             byte[] response = receiveByteArray();
             if (response != null && response.length > 0) {
-                byte type = response[response.length - 1];
+                byte type = response[response.length - 2];
                 int typeInt = Byte.toUnsignedInt(type);
+                byte ackValue = response[response.length - 1];
+                int ackInt = Byte.toUnsignedInt(ackValue);
 
                 if (typeInt == NetTask.ACKNOWLEDGE) {
                     System.out.println("[ACK RECEIVED] ACK received. Register successful.\n");
@@ -63,8 +65,9 @@ public class nmsAgent {
                 byte[] defaultBuffer = receiveByteArray();
 
                 if (defaultBuffer.length > 0) {
-                    byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 38);
+                    byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 39);
                     int taskType = Byte.toUnsignedInt(bufferTemp[37]);
+                    int seqNum = Byte.toUnsignedInt(bufferTemp[38]);
 
                     int payloadLength = 0;
                     switch (taskType) {
@@ -89,7 +92,7 @@ public class nmsAgent {
                     }
                     ;
 
-                    byte[] bufferPayload = Arrays.copyOfRange(defaultBuffer, 38, 38 + payloadLength);
+                    byte[] bufferPayload = Arrays.copyOfRange(defaultBuffer, 39, 39 + payloadLength);
                     byte[] pduUUIDBytes = Arrays.copyOfRange(bufferTemp, 0, 36);
                     String pduUUID = new String(pduUUIDBytes, StandardCharsets.UTF_8);
                     int freq = Byte.toUnsignedInt(bufferPayload[0]);
@@ -101,24 +104,24 @@ public class nmsAgent {
                     System.out.println();
 
                     NetTask handler = new NetTask();
-                    byte[] ackPDU = handler.createAckPDU();
+                    byte[] ackPDU = handler.createAckPDU(seqNum);
                     int retries = 0;
                     while (retries < 3) {
                         sendByteArray(ackPDU);
                         if (retries == 0) {
                             System.out.println("[ACK SENT] Task received, sending ACK.");
-                            retries++;
                         }
+                        retries++;
                     }
 
-                        NetTask handlerPDU = new NetTask();
-                        double taskOutput = -1;
-                        taskOutput = executeTasks(taskType, freq);
-                        if (taskOutput > threshold) {
-                            // enviar o alertflow
-                        } else {
-                            handlerPDU.createOutput();
-                        }                    
+                    NetTask handlerPDU = new NetTask();
+                    double taskOutput = -1;
+                    taskOutput = executeTasks(taskType, freq);
+                    if (taskOutput > threshold) {
+                        // enviar o alertflow
+                    } else {
+                        handlerPDU.createOutput();
+                    }
                 } else {
                     Thread.sleep(100);
                 }

@@ -5,7 +5,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.Arrays;
+import java.util.HashMap;
 
+import utils.*;
 import PDU.NetTask;
 import parser.Json_parser;
 
@@ -15,6 +17,7 @@ public class nmsServer {
     private final static int PORT = 12345;
     private Map<Integer, byte[]> tasksMap;
     private ExecutorService clientThreadPool;
+    SeqManager seqNumbers = new SeqManager();
 
     public nmsServer() throws IOException {
         this.socket = new DatagramSocket(PORT);
@@ -60,21 +63,27 @@ public class nmsServer {
 
     private void handleClient(DatagramPacket packet) {
         try {
-            byte[] data = packet.getData();
+            byte[] dataEntry = packet.getData();
+            byte[] data = Arrays.copyOfRange(dataEntry, 0, 38);
             InetSocketAddress clientAddress = new InetSocketAddress(packet.getAddress(), packet.getPort());
 
             if (agentRegistry.containsValue(clientAddress)) {
                 return;
             }
 
-            int type = Byte.toUnsignedInt(data[data.length - 1]);
+            int type = Byte.toUnsignedInt(data[data.length - 2]);
 
             if (type == NetTask.REGISTER) {
                 int agentId = register(clientAddress);
+                agentRegistry.put(agentId, clientAddress);
+
+                seqNumbers.addRegistry(agentId, Byte.toUnsignedInt(data[data.length - 1]));
+
                 System.out.println("[REGISTER RECEIVED] Agent registered: ID = " + agentId);
 
+                int seqValue = seqNumbers.getSeqNumber(agentId);
                 NetTask handler = new NetTask();
-                byte[] ackPDU = handler.createAckPDU();
+                byte[] ackPDU = handler.createAckPDU(seqValue);
                 sendPacket(ackPDU, clientAddress);
                 System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentId);
             }
@@ -86,7 +95,6 @@ public class nmsServer {
 
     private int register(InetSocketAddress clientAddress) {
         int agentId = agentRegistry.size() + 1;
-        agentRegistry.put(agentId, clientAddress);
         return agentId;
     }
 
@@ -108,7 +116,13 @@ public class nmsServer {
     private void processTaskForAgent(int agentID, byte[] taskPDU) throws IOException {
         InetSocketAddress clientAddress = agentRegistry.get(agentID);
         if (clientAddress != null) {
-            sendPacket(taskPDU, clientAddress);
+            int newSeq = seqNumbers.getSeqNumber(agentID) + (taskPDU.length + 1);
+            seqNumbers.addToExistingValue(agentID, newSeq);
+
+            byte[] completeTask = insertSeqNumber(taskPDU,
+                    (byte) newSeq);
+
+            sendPacket(completeTask, clientAddress);
             System.out.println("[TASK SENT] Task sent to agent " + agentID);
             tasksMap.remove(agentID);
 
@@ -118,7 +132,8 @@ public class nmsServer {
                 try {
                     byte[] response = receivePacket();
                     if (response != null && response.length > 0) {
-                        int typeInt = Byte.toUnsignedInt(response[response.length - 1]);
+                        int typeInt = Byte.toUnsignedInt(response[response.length - 2]);
+                        int ackValue = Byte.toUnsignedInt(response[response.length - 1]);
                         if (typeInt == NetTask.ACKNOWLEDGE) {
                             ackReceived = true;
                             System.out.println("[ACK RECEIVED] ACK received from agent " + agentID);
@@ -136,6 +151,20 @@ public class nmsServer {
         } else {
             System.out.println("[ERROR] Agent " + agentID + " is not registered.");
         }
+    }
+
+    public static byte[] insertSeqNumber(byte[] originalArray, byte seqNumber) {
+        int uuidLength = 36;
+        int typeIndex = uuidLength;
+        int seqIndex = typeIndex + 2;
+
+        byte[] newArray = new byte[originalArray.length + 1];
+
+        System.arraycopy(originalArray, 0, newArray, 0, seqIndex); // Copia UUID e Type
+        newArray[seqIndex] = seqNumber;
+        System.arraycopy(originalArray, seqIndex, newArray, seqIndex + 1, originalArray.length - seqIndex); // Copia
+                                                                                                            // [Data]
+        return newArray;
     }
 
     public static void main(String[] args) {
