@@ -2,7 +2,8 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import PDU.NetTask;
 
@@ -10,11 +11,13 @@ public class nmsAgent {
     private DatagramSocket socket;
     private InetAddress serverAddress;
     private int serverPort;
+    private ExecutorService agentExecutor;
 
     public nmsAgent(String servidorIP, int porta) throws IOException {
-        this.socket = new DatagramSocket(serverPort);
         this.serverAddress = InetAddress.getByName(servidorIP);
         this.serverPort = porta;
+        this.socket = new DatagramSocket(); // Usa uma porta dinâmica para envio
+        this.agentExecutor = Executors.newFixedThreadPool(2);
     }
 
     public void sendByteArray(byte[] data) throws IOException {
@@ -38,14 +41,16 @@ public class nmsAgent {
 
             // Receber resposta
             byte[] response = receiveByteArray();
-            byte type = response[response.length - 1];
-            int typeInt = Byte.toUnsignedInt(type);
+            if (response != null && response.length > 0) {
+                byte type = response[response.length - 1];
+                int typeInt = Byte.toUnsignedInt(type);
 
-            if (typeInt == NetTask.ACKNOWLEDGE) {
-                System.out.println("[ACK RECEIVED] ACK received. Register successfull.\n");
+                if (typeInt == NetTask.ACKNOWLEDGE) {
+                    System.out.println("[ACK RECEIVED] ACK received. Register successful.\n");
+                }
             }
         } catch (IOException e) {
-            System.out.println("[REGISTER TIMEOUT] Register Failed. Re-sending...\n");
+            System.out.println("[REGISTER TIMEOUT] Register failed. Re-sending...\n" + e.getMessage());
         }
     }
 
@@ -53,16 +58,11 @@ public class nmsAgent {
         try {
             System.out.println("Waiting for tasks...");
 
-            while (true) { // Loop infinito para ficar a espera de dados
-                NetTask handler = new NetTask();
+            while (true) {
                 byte[] defaultBuffer = receiveByteArray();
-                int bytesRead = defaultBuffer.length;
 
-                if (bytesRead > 0) {
-
-                    // Processa os dados recebidos
+                if (defaultBuffer.length > 0) {
                     byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 38);
-
                     int taskType = Byte.toUnsignedInt(bufferTemp[37]);
 
                     int payloadLength = 0;
@@ -82,7 +82,11 @@ public class nmsAgent {
                         case 4:
                             payloadLength = 5;
                             break;
+                        default:
+                            payloadLength = 0;
+                            break;
                     }
+                    ;
 
                     byte[] bufferPayload = Arrays.copyOfRange(defaultBuffer, 38, 38 + payloadLength);
                     byte[] pduUUIDBytes = Arrays.copyOfRange(bufferTemp, 0, 36);
@@ -90,60 +94,48 @@ public class nmsAgent {
                     int freq = Byte.toUnsignedInt(bufferPayload[0]);
                     int threshold = Byte.toUnsignedInt(bufferPayload[1]);
 
-                    System.out.println("[TASK RECEIVED] Task received: ");
+                    System.out.println("[TASK RECEIVED] Task received:");
                     System.out.println("Task_type: " + taskType + "\nUUID: " + pduUUID);
-                    System.out.println("Frequency: " + freq + "\nthreshold: " + threshold);
+                    System.out.println("Frequency: " + freq + "\nThreshold: " + threshold);
                     System.out.println();
 
+                    NetTask handler = new NetTask();
                     byte[] ackPDU = handler.createAckPDU();
-                    sendByteArray(ackPDU);
-                    System.out.println("[ACK SENT] Task Received, sending ACK");
-
+                    int retries = 0;
+                    while (retries < 3) {
+                        sendByteArray(ackPDU);
+                        if (retries == 0) {
+                            System.out.println("[ACK SENT] Task received, sending ACK.");
+                            retries++;
+                        }
+                    }
                 } else {
                     Thread.sleep(100);
                 }
-
             }
         } catch (IOException | InterruptedException e) {
             System.out.println("Error receiving tasks: " + e.getMessage());
         }
     }
 
-    public void closeConnection() {
-        if (socket != null) {
-            socket.close();
-        }
+    public void start() {
+        this.register();
+        agentExecutor.submit(this::receiveTasks);
     }
 
     public static void main(String[] args) {
         int porta = 12345;
 
         try {
-            nmsAgent agente = new nmsAgent(args[0], porta);
-            agente.register();
-            agente.receiveTasks();
-
-            Scanner scanner = new Scanner(System.in);
-            String comando;
-
-            System.out.println("Press 'q' to close the connection.");
-
-            // Loop que aguarda a entrada do usuário
-            while (true) {
-                // Lê a entrada do usuário
-                comando = scanner.nextLine();
-
-                // Verifica se o usuário digitou 'q' para fechar a conexão
-                if (comando.equalsIgnoreCase("q")) {
-                    System.out.println("Closing connection");
-                    agente.closeConnection();
-                    break; // Encerra o loop e termina o programa
-                }
+            if (args.length < 1) {
+                System.out.println("Usage: java nmsAgent IP=<server IP>");
+                return;
             }
+            nmsAgent agente = new nmsAgent(args[0], porta);
+            agente.start();
 
-            scanner.close(); // Fecha o scanner ao terminar o loop
         } catch (IOException e) {
-            System.out.println("Erro ao iniciar o agente: " + e.getMessage());
+            System.out.println("Error initializing agent: " + e.getMessage());
         }
     }
 }
