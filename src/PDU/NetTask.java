@@ -17,36 +17,40 @@ public class NetTask implements Serializable {
     public static final int OUTPUT = 3;
     public static final int END = 4;
 
-    public byte[] createRegisterPDU() {
+    public byte[] createRegisterPDU(int seq) {
         String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
         int type = REGISTER;
 
         byte type_byte = (byte) type;
         byte[] uuidBytes = uuid.getBytes();
+        byte seq_byte = (byte) seq;
 
         // Criar um ByteBuffer para conter o tipo e o UUID
-        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 1); // 4 bytes para o int e o restante para o
+        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 2); // 4 bytes para o int e o restante para o
         // UUID
         buffer.put(uuidBytes); // Coloca os bytes do UUID no buffer
         buffer.put(type_byte); // Coloca o tipo (int) no buffer
+        buffer.put(seq_byte);
 
         byte[] registerPDU = buffer.array(); // Obter o array de bytes
 
         return registerPDU;
     }
 
-    public byte[] createAckPDU() {
+    public byte[] createAckPDU(int ackValue) {
         String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
         int type = ACKNOWLEDGE;
 
         byte type_byte = (byte) type;
         byte[] uuidBytes = uuid.getBytes();
+        byte ack_valueByte = (byte) ackValue;
 
         // Criar um ByteBuffer para conter o tipo e o UUID
-        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 1); // 4 bytes para o int e o restante para o
+        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 2); // 4 bytes para o int e o restante para o
                                                                        // UUID
         buffer.put(uuidBytes); // Coloca os bytes do UUID no buffer
         buffer.put(type_byte); // Coloca o tipo (int) no buffer
+        buffer.put(ack_valueByte);
 
         byte[] ackPDU = buffer.array(); // Obter o array de bytes
 
