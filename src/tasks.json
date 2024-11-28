@@ -5,26 +5,16 @@
         "data": {
             "task_type": 0,
             "frequency": 1,
-            "devices": [
-                {
-                    "device_metrics": {
-                        "cpu_usage": true,
-                        "ram_usage": true,
-                        "interface_stats": [
-                            "eth0",
-                            "eth1",
-                            "eth2"
-                        ]
-                    },
-                    "alertflow_conditions": {
-                        "cpu_usage": 80,
-                        "ram_usage": 90,
-                        "interface_stats": 2000,
-                        "packet_loss": 5,
-                        "jitter": 100
-                    }
-                }
-            ]
+            "alertflow_condition": 100
+        }
+    },
+    {
+        "agent_id": 2,
+        "type": 2,
+        "data": {
+            "task_type": 1,
+            "frequency": 1,
+            "alertflow_condition": 100
         }
     }
 ]
