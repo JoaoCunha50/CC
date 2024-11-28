@@ -75,7 +75,7 @@ public class nmsServer {
             byte[] data = Arrays.copyOfRange(dataEntry, 0, 38);
             InetSocketAddress clientAddress = new InetSocketAddress(packet.getAddress(), packet.getPort());
 
-            if (agentRegistry.containsValue(clientAddress)) {
+            if (agentRegistry.containsValue(clientAddress)){
                 return;
             }
 
@@ -84,15 +84,18 @@ public class nmsServer {
             if (type == NetTask.REGISTER) {
                 int agentId = register(clientAddress);
                 agentRegistry.put(agentId, clientAddress);
-
                 seqNumbers.addRegistry(agentId, Byte.toUnsignedInt(data[data.length - 1]));
 
-                System.out.println("[REGISTER RECEIVED] Agent registered: ID = " + agentId);
+                System.out.println("[REGISTER RECEIVED] Agent registered: ID = " + agentId + " IP: " + clientAddress.getAddress());
 
                 int seqValue = seqNumbers.getSeqNumber(agentId);
+                int seqNum = seqNumbers.getNextSeqNum(data, seqValue);
+                seqNumbers.addToExistingValue(agentId, seqNum);
+
                 NetTask handler = new NetTask();
-                byte[] ackPDU = handler.createAckPDU(seqValue);
+                byte[] ackPDU = handler.createAckPDU(seqNum);
                 sendPacket(ackPDU, clientAddress);
+
                 System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentId);
             }
         } catch (IOException e) {
@@ -124,8 +127,7 @@ public class nmsServer {
     private void processTaskForAgent(int agentID, byte[] taskPDU) throws IOException {
         InetSocketAddress clientAddress = agentRegistry.get(agentID);
         if (clientAddress != null) {
-            int newSeq = seqNumbers.getSeqNumber(agentID) + (taskPDU.length + 1);
-            seqNumbers.addToExistingValue(agentID, newSeq);
+            int newSeq = seqNumbers.getSeqNumber(agentID);
 
             byte[] completeTask = insertSeqNumber(taskPDU,
                     (byte) newSeq);
@@ -145,8 +147,8 @@ public class nmsServer {
                     if (response != null && response.length > 0) {
                         int typeInt = Byte.toUnsignedInt(response[response.length - 2]);
                         int ackValue = Byte.toUnsignedInt(response[response.length - 1]);
-
-                        if (typeInt == NetTask.ACKNOWLEDGE) {
+                        if (typeInt == NetTask.ACKNOWLEDGE && ackValue == newSeq + completeTask.length) {
+                            seqNumbers.addToExistingValue(agentID, ackValue);
                             ackReceived = true;
                             System.out.println("[ACK RECEIVED] ACK received from agent " + agentID);
                         }

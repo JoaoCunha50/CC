@@ -22,6 +22,12 @@ public class SeqManager {
         }
     }
 
+    public int getNextSeqNum(byte[] packet, int seqnum){
+        int nextSeqnum = 0;
+        nextSeqnum = packet.length + seqnum;
+        return nextSeqnum;
+    }
+
     public int getSeqNumber(int agentID) {
         return seqMap.get(agentID);
     }

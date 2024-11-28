@@ -13,12 +13,14 @@ public class nmsAgent {
     private InetAddress serverAddress;
     private int serverPort;
     private ExecutorService agentExecutor;
+    private int seqnum_atual;
 
     public nmsAgent(String servidorIP, int porta) throws IOException {
         this.serverAddress = InetAddress.getByName(servidorIP);
         this.serverPort = porta;
         this.socket = new DatagramSocket(); // Usa uma porta dinâmica para envio
         this.agentExecutor = Executors.newFixedThreadPool(2);
+        this.seqnum_atual = 1;
     }
 
     public void sendByteArray(byte[] data) throws IOException {
@@ -36,19 +38,18 @@ public class nmsAgent {
     public void register() {
         try {
             NetTask handler = new NetTask();
-            byte[] registerPDU = handler.createRegisterPDU(1);
+            byte[] registerPDU = handler.createRegisterPDU(seqnum_atual);
             sendByteArray(registerPDU);
             System.out.println("[REGISTER SENT] Register PDU sent.");
 
             // Receber resposta
             byte[] response = receiveByteArray();
             if (response != null && response.length > 0) {
-                byte type = response[response.length - 2];
-                int typeInt = Byte.toUnsignedInt(type);
-                byte ackValue = response[response.length - 1];
-                int ackInt = Byte.toUnsignedInt(ackValue);
+                int typeInt = Byte.toUnsignedInt(response[response.length - 2]);
+                int ackInt = Byte.toUnsignedInt(response[response.length - 1]);
 
-                if (typeInt == NetTask.ACKNOWLEDGE) {
+                if (typeInt == NetTask.ACKNOWLEDGE && ackInt == (seqnum_atual + registerPDU.length)) {
+                    seqnum_atual = ackInt;
                     System.out.println("[ACK RECEIVED] ACK received. Register successful.\n");
                 }
             }
@@ -100,11 +101,12 @@ public class nmsAgent {
 
                     System.out.println("[TASK RECEIVED] Task received:");
                     System.out.println("Task_type: " + taskType + "\nUUID: " + pduUUID);
-                    System.out.println("Frequency: " + freq + "\nThreshold: " + threshold);
+                    System.out.println("Frequency: " + freq + "\nThreshold: " + threshold + "\nSeq num: " + seqNum);
                     System.out.println();
 
                     NetTask handler = new NetTask();
-                    byte[] ackPDU = handler.createAckPDU(seqNum);
+                    seqnum_atual = seqNum + defaultBuffer.length;
+                    byte[] ackPDU = handler.createAckPDU(seqnum_atual);
                     int retries = 0;
                     while (retries < 3) {
                         sendByteArray(ackPDU);

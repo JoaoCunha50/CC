@@ -5,6 +5,9 @@ import com.sun.management.OperatingSystemMXBean;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class TasksHandler {
 
@@ -23,23 +26,7 @@ public class TasksHandler {
         }
     }
 
-    public static double measureCPUusage(int frequency) throws InterruptedException { // tenho de tirar a frequency
-        OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
 
-        double initialCPUload = osBean.getSystemCpuLoad();
-        Thread.sleep(frequency * 1000);
-        double finalCPUload = osBean.getSystemCpuLoad();
-
-        double cpuUsage = ((initialCPUload + finalCPUload) / 2) * 100;
-
-        // Arredonda para duas casas decimais
-        cpuUsage = Math.round(cpuUsage * 100.0) / 100.0;
-
-        // Exibe o valor formatado
-        System.out.println("CPU Use: " + cpuUsage + "%");
-
-        return cpuUsage;
-    }
 
     public static double measureCPUusage2() {
         double cpuUsage = -1.0; // Initialize with a default value
@@ -61,11 +48,15 @@ public class TasksHandler {
                 }
             }
 
-            // Wait for the process to complete
-            process.waitFor();
+                // Wait for the process to complete
+                process.waitFor();
+
+                // If needed, you can use the cpuUsage value here
+                System.out.println("Parsed CPU Usage Value: " + cpuUsage);
 
         } catch (Exception e) {
             e.printStackTrace();
+            return 0;
         }
         System.out.println(cpuUsage);
         // Return the CPU usage
@@ -140,11 +131,5 @@ public class TasksHandler {
         System.out.println(avgValue);
 
         return avgValue;
-    }
-
-    public static void main(String[] args) throws InterruptedException {
-        measureCPUusage2();
-        measureRAMusage();
-        pingTask("google.com");
     }
 }
