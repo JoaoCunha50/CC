@@ -13,7 +13,7 @@ public class TasksHandler {
 
         switch (task) {
             case 0:
-                return measureCPUusage(frequency);
+                return measureCPUusage2();
             case 1:
                 return measureRAMusage();
             case 2:
@@ -41,7 +41,9 @@ public class TasksHandler {
         return cpuUsage;
     }
 
-    public static void measureCPUusage2() {
+    public static double measureCPUusage2() {
+        double cpuUsage = -1.0; // Initialize with a default value
+
         try {
             // Define the command to get CPU usage
             String command = "mpstat 1 1 | awk '/all/ {print 100 - $12}'";
@@ -52,24 +54,22 @@ public class TasksHandler {
 
             // Read the output
             String line;
-            double cpuUsage = -1.0; // Initialize with a default value
             while ((line = reader.readLine()) != null) {
                 if (!line.trim().isEmpty()) {
                     // Parse the output into a double
                     cpuUsage = Double.parseDouble(line.trim());
-                    System.out.println("CPU Usage: " + cpuUsage + "%");
                 }
             }
 
             // Wait for the process to complete
             process.waitFor();
 
-            // If needed, you can use the cpuUsage value here
-            System.out.println("Parsed CPU Usage Value: " + cpuUsage);
-
         } catch (Exception e) {
             e.printStackTrace();
         }
+        System.out.println(cpuUsage);
+        // Return the CPU usage
+        return cpuUsage;
     }
 
     public static double measureRAMusage() throws InterruptedException {
@@ -83,7 +83,6 @@ public class TasksHandler {
         double usedMemory = ((double) (totalMemory - freeMemory) / totalMemory) * 100;
         // Arredonda para duas casas decimais
         usedMemory = Math.round(usedMemory * 100.0) / 100.0;
-        System.out.println("RAM Use: " + usedMemory + "%");
 
         return usedMemory;
     }
