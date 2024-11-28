@@ -120,9 +120,14 @@ public class nmsAgent {
                     double taskOutput = -1;
                     taskOutput = executeTasks(taskType, freq);
                     if (taskOutput > threshold) {
-                        // enviar o alertflow
+                        System.out.println("[ALERTFLOW] Metric is above threshold");
                     } else {
-                        handlerPDU.createOutput();
+                        byte[] metricsPDU = handlerPDU.createOutput(taskOutput);
+                        sendByteArray(metricsPDU);
+                        System.out.println("[METRICS SENT] Task Output sent.");
+                        System.out.println("     taskUUID: " + pduUUID);
+                        System.out.println("     metrics:  " + taskOutput);
+                        System.out.println();
                     }
                 } else {
                     Thread.sleep(100);

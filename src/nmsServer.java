@@ -1,11 +1,13 @@
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 import utils.*;
 import PDU.NetTask;
@@ -38,12 +40,18 @@ public class nmsServer {
         socket.send(packet);
     }
 
-    private byte[] receivePacket() throws IOException {
+    private List<Object> receivePacket() throws IOException {
         byte[] buffer = new byte[1024];
         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
         socket.receive(packet);
-        return Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
+
+        InetAddress clientAddress = packet.getAddress();
+        int clientPort = packet.getPort(); // Obter a porta do cliente
+        byte[] data = Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
+
+        // Retorna dados e InetSocketAddress
+        return Arrays.asList(data, new InetSocketAddress(clientAddress, clientPort));
     }
 
     public void start() {
@@ -132,7 +140,10 @@ public class nmsServer {
             int retries = 0;
             while (!ackReceived && retries < 3) {
                 try {
-                    byte[] response = receivePacket();
+                    List<Object> receivedData = receivePacket();
+                    byte[] response = (byte[]) receivedData.get(0); // Dados do pacote
+                    InetSocketAddress clientSocketAddress = (InetSocketAddress) receivedData.get(1); 
+
                     if (response != null && response.length > 0) {
                         int typeInt = Byte.toUnsignedInt(response[response.length - 2]);
                         int ackValue = Byte.toUnsignedInt(response[response.length - 1]);
@@ -142,6 +153,7 @@ public class nmsServer {
                             System.out.println("[ACK RECEIVED] ACK received from agent " + agentID);
                         }
                     }
+
                 } catch (SocketTimeoutException e) {
                     retries++;
                     System.out.println(
@@ -168,6 +180,43 @@ public class nmsServer {
         System.arraycopy(originalArray, seqIndex, newArray, seqIndex + 1, originalArray.length - seqIndex); // Copia
                                                                                                             // [Data]
         return newArray;
+    }
+
+    public void receiveMetrics() {
+        try {
+            while (true) {
+                // Recebe os dados e o endereço do cliente com a porta
+                List<Object> receivedData = receivePacket();
+                byte[] defaultBuffer = (byte[]) receivedData.get(0);
+                InetSocketAddress clientSocketAddress = (InetSocketAddress) receivedData.get(1);
+
+                if (defaultBuffer.length > 0) {
+                    byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 38);
+
+                    byte[] pduUUIDBytes = Arrays.copyOfRange(bufferTemp, 0, 36);
+                    String pduUUID = new String(pduUUIDBytes, StandardCharsets.UTF_8);
+
+                    int type = Byte.toUnsignedInt(bufferTemp[36]);
+                    int output = Byte.toUnsignedInt(bufferTemp[37]);
+
+                    System.out.println("[METRICS RECEIVED] Task Output received:");
+                    System.out.println("     taskUUID: " + pduUUID);
+                    System.out.println("     metrics:  " + output);
+                    System.out.println();
+
+                    NetTask handler = new NetTask();
+                    byte[] ackPDU = handler.createAckPDU(10);
+
+                    // Envia ACK para o cliente usando InetSocketAddress
+                    sendPacket(ackPDU, clientSocketAddress);
+                    System.out.println("[ACK SENT] Acknowledgement sent to agent.");
+                } else {
+                    Thread.sleep(100);
+                }
+            }
+        } catch (IOException | InterruptedException e) {
+            System.out.println("Error receiving tasks: " + e.getMessage());
+        }
     }
 
     public static void main(String[] args) {
