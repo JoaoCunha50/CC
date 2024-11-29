@@ -14,7 +14,7 @@ public class NetTask implements Serializable {
     public static final int REGISTER = 0;
     public static final int ACKNOWLEDGE = 1;
     public static final int TASK = 2;
-    public static final int OUTPUT = 3;
+    public static final int METRICS = 3;
     public static final int END = 4;
 
     public byte[] createRegisterPDU(int seq) {
@@ -212,7 +212,7 @@ public class NetTask implements Serializable {
 
     public byte[] createOutput(double outputValue) {
         String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
-        int type = OUTPUT;
+        int type = METRICS;
 
         byte type_byte = (byte) type;
         byte[] uuidBytes = uuid.getBytes();
