@@ -95,6 +95,7 @@ public class nmsAgent {
                             payloadLength = 9;
                             break;
                         case 3:
+                        case 4:
                             byte[] nextThreeBytes = Arrays.copyOfRange(defaultBuffer, 39, 42);
                             byte iperfMode = nextThreeBytes[2];
                             if (iperfMode == 1) {
@@ -102,9 +103,6 @@ public class nmsAgent {
                             } else if (iperfMode == 0) {
                                 payloadLength = 7;
                             }
-                            break;
-                        case 4:
-                            payloadLength = 5;
                             break;
                         default:
                             payloadLength = 0;
@@ -118,7 +116,7 @@ public class nmsAgent {
                     int freq = Byte.toUnsignedInt(bufferPayload[0]);
                     int threshold = Byte.toUnsignedInt(bufferPayload[1]);
                     final int iperfMode;
-                    if (taskType == 3) {
+                    if (taskType == 3 || taskType == 4) {
                         iperfMode = Byte.toUnsignedInt(bufferPayload[2]);
                     } else
                         iperfMode = -1;
@@ -130,7 +128,7 @@ public class nmsAgent {
                     }
 
                     final String destIP;
-                    if (taskType == 3 && ipBytes != null) {
+                    if ((taskType == 3 || taskType == 4) && ipBytes != null) {
                         InetAddress inetAddress = InetAddress.getByAddress(ipBytes);
                         destIP = inetAddress.getHostAddress();
                     } else {

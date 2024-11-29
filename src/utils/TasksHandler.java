@@ -6,12 +6,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class TasksHandler {
 
     public double handleTasks(int task, int frequency, String ip, int mode) throws InterruptedException {
         double output = 404;
-
         switch (task) {
             case 0:
                 return measureCPUusage();
@@ -22,9 +23,14 @@ public class TasksHandler {
             case 3:
                 if (mode == 1) {
                     createIperfServer();
-                    System.out.println("tou a abrir");
                 } else if (mode == 0) {
                     return getIperfBandwidth(ip);
+                }
+            case 4:
+                if (mode == 1) {
+                    createIperfServer();
+                } else if (mode == 0) {
+                    return getIperfJitter(ip);
                 }
             default:
                 return output;
@@ -131,7 +137,7 @@ public class TasksHandler {
     }
 
     private static void createIperfServer() {
-        String command = "iperf -s"; // Pode usar "iperf -s" ou "iperf3 -s" dependendo da versão
+        String command = "iperf3 -s"; // Pode usar "iperf -s" ou "iperf3 -s" dependendo da versão
         try {
             // Usando o ProcessBuilder para rodar o comando no sistema operacional
             ProcessBuilder builder = new ProcessBuilder(command.split(" "));
@@ -154,7 +160,7 @@ public class TasksHandler {
     }
 
     private static double getIperfBandwidth(String serverIp) {
-        String command = "iperf -c " + serverIp + " -t 10 -f m"; // "-f m" para exibir a largura de banda em Mbps
+        String command = "iperf3 -c " + serverIp + " -t 10 -f m"; // "-f m" para exibir a largura de banda em Mbps
         double bandwidth = -1.0; // Valor inicial negativo indicando que a largura de banda não foi encontrada.
 
         try {
@@ -192,9 +198,54 @@ public class TasksHandler {
         } catch (InterruptedException e) {
             System.err.println("O processo foi interrompido: " + e.getMessage());
         }
-        System.out.println("A largura de banda é: " + bandwidth);
+        // System.out.println("A largura de banda é: " + bandwidth);
 
         return bandwidth;
+    }
+
+    private static double getIperfJitter(String serverIp) {
+        try {
+            // Comando para executar o iperf3
+            String command = "iperf3 -c " + serverIp + " -u -t 10";
+
+            // Criação do processo
+            ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));
+            Process process = processBuilder.start();
+
+            // Aguarda o término do processo
+            process.waitFor();
+
+            // Lê a saída completa do comando
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            String lastRelevantLine = null; // Para armazenar a última linha relevante
+
+            // Itera pela saída linha por linha e guarda a última linha relevante
+            while ((line = reader.readLine()) != null) {
+                if (line.contains("ms")) { // Busca linhas que contenham "ms"
+                    lastRelevantLine = line; // Atualiza para a última linha encontrada
+                }
+            }
+
+            // Verifica se encontramos uma linha relevante
+            if (lastRelevantLine != null) {
+                // Divide a linha para capturar o valor antes de "ms"
+                String[] parts = lastRelevantLine.trim().split("\\s+"); // Divide por espaços
+                for (int i = 0; i < parts.length; i++) {
+                    if (parts[i].equals("ms") && i > 0) { // Encontra "ms" e pega o valor anterior
+                        double jitterMs = Double.parseDouble(parts[i - 1]); // Converte o valor anterior para double
+                        double jitterSeconds = jitterMs * 1000.0; // Converte milissegundos para segundos
+                        return jitterSeconds; // Retorna o jitter em segundos
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        // Retorna 0.0 se nenhum jitter for encontrado
+        return 0.0;
     }
 
 }

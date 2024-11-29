@@ -3,7 +3,7 @@
         "agent_id": 1,
         "type": 2,
         "data": {
-            "task_type": 3,
+            "task_type": 4,
             "frequency": 0,
             "alertflow_condition": 100,
             "mode" : "server"
@@ -13,7 +13,7 @@
         "agent_id": 2,
         "type": 2,
         "data": {
-            "task_type": 3,
+            "task_type": 4,
             "frequency": 3,
             "alertflow_condition": 100,
             "mode" : "client",
