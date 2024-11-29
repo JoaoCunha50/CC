@@ -4,7 +4,7 @@
         "type": 2,
         "data": {
             "task_type": 0,
-            "frequency": 1,
+            "frequency": 3,
             "alertflow_condition": 100
         }
     },
@@ -13,7 +13,7 @@
         "type": 2,
         "data": {
             "task_type": 1,
-            "frequency": 1,
+            "frequency": 3,
             "alertflow_condition": 100
         }
     }

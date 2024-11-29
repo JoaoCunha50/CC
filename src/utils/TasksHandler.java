@@ -5,9 +5,6 @@ import com.sun.management.OperatingSystemMXBean;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class TasksHandler {
 
@@ -16,7 +13,7 @@ public class TasksHandler {
 
         switch (task) {
             case 0:
-                return measureCPUusage2();
+                return measureCPUusage();
             case 1:
                 return measureRAMusage();
             case 2:
@@ -26,11 +23,8 @@ public class TasksHandler {
         }
     }
 
-
-
-    public static double measureCPUusage2() {
+    public static double measureCPUusage() {
         double cpuUsage = -1.0; // Initialize with a default value
-
         try {
             // Define the command to get CPU usage
             String command = "mpstat 1 1 | awk '/all/ {print 100 - $12}'";
@@ -48,17 +42,12 @@ public class TasksHandler {
                 }
             }
 
-                // Wait for the process to complete
-                process.waitFor();
-
-                // If needed, you can use the cpuUsage value here
-                System.out.println("Parsed CPU Usage Value: " + cpuUsage);
+            // Wait for the process to complete
+            process.waitFor();
 
         } catch (Exception e) {
             e.printStackTrace();
-            return 0;
         }
-        System.out.println(cpuUsage);
         // Return the CPU usage
         return cpuUsage;
     }

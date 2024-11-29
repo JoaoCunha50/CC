@@ -4,6 +4,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 import utils.*;
 import PDU.NetTask;
@@ -14,6 +17,7 @@ public class nmsAgent {
     private int serverPort;
     private ExecutorService agentExecutor;
     private int seqnum_atual;
+    private ReentrantLock lock;
 
     public nmsAgent(String servidorIP, int porta) throws IOException {
         this.serverAddress = InetAddress.getByName(servidorIP);
@@ -21,6 +25,7 @@ public class nmsAgent {
         this.socket = new DatagramSocket(); // Usa uma porta dinâmica para envio
         this.agentExecutor = Executors.newFixedThreadPool(2);
         this.seqnum_atual = 1;
+        this.lock = new ReentrantLock();
     }
 
     public void sendByteArray(byte[] data) throws IOException {
@@ -116,19 +121,29 @@ public class nmsAgent {
                         retries++;
                     }
 
-                    NetTask handlerPDU = new NetTask();
-                    double taskOutput = -1;
-                    taskOutput = executeTasks(taskType, freq);
-                    if (taskOutput > threshold) {
-                        System.out.println("[ALERTFLOW] Metric is above threshold");
-                    } else {
-                        byte[] metricsPDU = handlerPDU.createOutput(taskOutput);
-                        sendByteArray(metricsPDU);
-                        System.out.println("[METRICS SENT] Task Output sent.");
-                        System.out.println("     taskUUID: " + pduUUID);
-                        System.out.println("     metrics:  " + taskOutput);
-                        System.out.println();
-                    }
+                    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+                    Runnable task = () -> {
+                        try {
+                            NetTask handlerPDU = new NetTask();
+                            double taskOutput = -1;
+
+                            // Executa a tarefa
+                            taskOutput = executeTasks(taskType, freq);
+
+                            if (taskOutput > threshold) {
+                                System.out.println("[ALERTFLOW] Metric is above threshold");
+                            } else {
+                                sendMetrics(handlerPDU, taskOutput);
+                            }
+                        } catch (InterruptedException e) {
+                            System.err.println("[ERROR] Task execution was interrupted: " + e.getMessage());
+                            Thread.currentThread().interrupt(); // Restaura o estado de interrupção da thread
+                        }
+                    };
+                    // Agenda a tarefa com frequência definida
+                    scheduler.scheduleAtFixedRate(task, 0, freq, TimeUnit.SECONDS);
+
                 } else {
                     Thread.sleep(100);
                 }
@@ -140,9 +155,26 @@ public class nmsAgent {
 
     public double executeTasks(int taskType, int frequency) throws InterruptedException {
         TasksHandler execute = new TasksHandler();
-        double output = -1;
-        output = execute.handleTasks(taskType, frequency, "");
-        return output;
+        return execute.handleTasks(taskType, frequency, "");
+    }
+
+    public void sendMetrics(NetTask handlerPDU, double taskOutput) {
+        lock.lock();
+        try {
+            byte[] metricsPDU = handlerPDU.createOutput(taskOutput);
+            byte[] metricsUUIDBytes = Arrays.copyOfRange(metricsPDU, 0, 36);
+            String metricsUUID = new String(metricsUUIDBytes, StandardCharsets.UTF_8);
+            sendByteArray(metricsPDU);
+            System.out.println("[METRICS SENT] Task Output sent.");
+            System.out.println("     taskUUID: " + metricsUUID);
+            System.out.println("     metrics:  " + taskOutput);
+            System.out.println();
+        } catch (IOException e) {
+            System.err.println("[ERROR] Task execution was interrupted: " + e.getMessage());
+            Thread.currentThread().interrupt(); // Restaura o estado de interrupção da thread
+        } finally {
+            lock.unlock();
+        }
     }
 
     public void closeConnection() {
@@ -158,14 +190,14 @@ public class nmsAgent {
     }
 
     public static void main(String[] args) {
-        int porta = 12345;
+        int portaUDP = 12345;
 
         try {
             if (args.length < 1) {
                 System.out.println("Usage: java nmsAgent IP=<server IP>");
                 return;
             }
-            nmsAgent agente = new nmsAgent(args[0], porta);
+            nmsAgent agente = new nmsAgent(args[0], portaUDP);
             agente.start();
 
         } catch (IOException e) {
