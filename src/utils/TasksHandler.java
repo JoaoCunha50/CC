@@ -234,8 +234,8 @@ public class TasksHandler {
                 for (int i = 0; i < parts.length; i++) {
                     if (parts[i].equals("ms") && i > 0) { // Encontra "ms" e pega o valor anterior
                         double jitterMs = Double.parseDouble(parts[i - 1]); // Converte o valor anterior para double
-                        double jitterSeconds = jitterMs * 1000.0; // Converte milissegundos para segundos
-                        return jitterSeconds; // Retorna o jitter em segundos
+                        double jitterSeconds = jitterMs * 1000.0; // Converte milissegundos para microsegundos
+                        return jitterSeconds; // Retorna o jitter em microsegundos
                     }
                 }
             }
