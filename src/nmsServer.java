@@ -20,7 +20,7 @@ public class nmsServer {
     private final static int PortaTCP = 1234;
     private Map<Integer, InetSocketAddress> agentRegistry = new ConcurrentHashMap<>();
     private Map<Integer, Thread> agentThreads = new HashMap<>();
-    private Map<Integer, byte[]> tasksMap = new ConcurrentHashMap<>();
+    private Map<Integer, List<byte[]>> tasksMap = new ConcurrentHashMap<>();
     SeqManager seqNumbers = new SeqManager();
     private ReentrantLock lock = new ReentrantLock();
 
@@ -104,7 +104,7 @@ public class nmsServer {
         List<Integer> taskKeys = new ArrayList<>(tasksMap.keySet());
         for (Integer agentID : taskKeys) {
             if (agentID == id) {
-                byte[] taskPDU = tasksMap.get(agentID);
+                List<byte[]> taskPDU = tasksMap.get(agentID);
                 if (taskPDU != null) {
                     try {
                         processTaskForAgent(agentID, taskPDU);
@@ -118,48 +118,57 @@ public class nmsServer {
         }
     }
 
-    private void processTaskForAgent(int agentID, byte[] taskPDU) throws IOException {
+    private void processTaskForAgent(int agentID, List<byte[]> taskPDUs) throws IOException {
+        // Verificar se o agente está registrado
         InetSocketAddress clientAddress = agentRegistry.get(agentID);
-        if (clientAddress != null) {
-            int newSeq = seqNumbers.getSeqNumber(agentID);
-
-            byte[] completeTask = insertSeqNumber(taskPDU,
-                    (byte) newSeq);
-
+        for (byte[] task : taskPDUs) {
+            int newSeq = seqNumbers.getSeqNumber(agentID); // Obter número de sequência para o agente
+    
+            // Inserir número de sequência no pacote
+            byte[] completeTask = insertSeqNumber(task, (byte) newSeq);
+    
+            // Enviar tarefa
             sendPacket(completeTask, clientAddress);
             System.out.println("[TASK SENT] Task sent to agent " + agentID);
-
+    
             boolean ackReceived = false;
             int retries = 0;
+    
+            // Loop de retransmissão até receber ACK ou atingir limite de tentativas
             while (!ackReceived && retries < 3) {
                 try {
+                    // Receber resposta
                     List<Object> receivedData = receivePacket();
                     byte[] response = (byte[]) receivedData.get(0); // Dados do pacote
                     InetSocketAddress clientSocketAddress = (InetSocketAddress) receivedData.get(1);
-
+    
                     if (response != null && response.length > 0) {
+                        // Extração do tipo e valor do ACK
                         int typeInt = Byte.toUnsignedInt(response[response.length - 2]);
                         int ackValue = Byte.toUnsignedInt(response[response.length - 1]);
+    
+                        // Verificar se o pacote é um ACK e se o valor do ACK é válido
                         if (typeInt == NetTask.ACKNOWLEDGE && ackValue == newSeq + completeTask.length) {
-                            seqNumbers.addToExistingValue(agentID, ackValue);
+                            seqNumbers.addToExistingValue(agentID, ackValue); // Atualizar número de sequência
                             ackReceived = true;
                             System.out.println("[ACK RECEIVED] ACK received from agent " + agentID);
                         }
                     }
-
                 } catch (SocketTimeoutException e) {
                     retries++;
                     System.out.println(
                             "[RETRY] Retrying to send task to agent " + agentID + " (Attempt " + retries + ")");
+                    sendPacket(completeTask, clientAddress); // Reenviar tarefa
                 }
             }
+    
+            // Verificar se falhou após 3 tentativas
             if (!ackReceived) {
                 System.out.println("[FAILED] Failed to receive ACK from agent " + agentID + " after 3 attempts");
             }
-        } else {
-            System.out.println("[ERROR] Agent " + agentID + " is not registered.");
         }
     }
+    
 
     public static byte[] insertSeqNumber(byte[] originalArray, byte seqNumber) {
         int uuidLength = 36;
