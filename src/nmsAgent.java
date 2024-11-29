@@ -79,6 +79,7 @@ public class nmsAgent {
 
                 if (defaultBuffer.length > 0) {
                     byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 39);
+                    // o bufferTemp[36] é o type da mensagem!
                     int taskType = Byte.toUnsignedInt(bufferTemp[37]);
                     int seqNum = Byte.toUnsignedInt(bufferTemp[38]);
 
@@ -94,7 +95,13 @@ public class nmsAgent {
                             payloadLength = 9;
                             break;
                         case 3:
-                            payloadLength = 9;
+                            byte[] nextThreeBytes = Arrays.copyOfRange(defaultBuffer, 39, 42);
+                            byte iperfMode = nextThreeBytes[2];
+                            if (iperfMode == 1) {
+                                payloadLength = 3;
+                            } else if (iperfMode == 0) {
+                                payloadLength = 7;
+                            }
                             break;
                         case 4:
                             payloadLength = 5;
@@ -110,6 +117,25 @@ public class nmsAgent {
                     String pduUUID = new String(pduUUIDBytes, StandardCharsets.UTF_8);
                     int freq = Byte.toUnsignedInt(bufferPayload[0]);
                     int threshold = Byte.toUnsignedInt(bufferPayload[1]);
+                    final int iperfMode;
+                    if (taskType == 3) {
+                        iperfMode = Byte.toUnsignedInt(bufferPayload[2]);
+                    } else
+                        iperfMode = -1;
+
+                    byte[] ipBytes = null;
+                    if (iperfMode == 0) {
+                        ipBytes = Arrays.copyOfRange(bufferPayload, bufferPayload.length - 4,
+                                bufferPayload.length);
+                    }
+
+                    final String destIP;
+                    if (taskType == 3 && ipBytes != null) {
+                        InetAddress inetAddress = InetAddress.getByAddress(ipBytes);
+                        destIP = inetAddress.getHostAddress();
+                    } else {
+                        destIP = "0.0.0.0";
+                    }
 
                     System.out.println("[TASK RECEIVED] Task received:");
                     System.out.println("Task_type: " + taskType + "\nUUID: " + pduUUID);
@@ -136,7 +162,7 @@ public class nmsAgent {
                                 double taskOutput = -1;
 
                                 // Executa a tarefa
-                                taskOutput = executeTasks(taskType, freq);
+                                taskOutput = executeTasks(taskType, freq, iperfMode, destIP);
 
                                 if (taskOutput > threshold) {
                                     System.out.println("[ALERTFLOW] Metric is above threshold");
@@ -155,9 +181,9 @@ public class nmsAgent {
                         double taskOutput = -1;
 
                         // Executa a tarefa
-                        taskOutput = executeTasks(taskType, freq);
+                        taskOutput = executeTasks(taskType, freq, iperfMode, destIP);
 
-                        if (taskOutput > threshold) {
+                        if (taskOutput > threshold && taskOutput != 404) {
                             System.out.println("[ALERTFLOW] Metric is above threshold");
                         } else {
                             sendMetrics(handlerPDU, taskOutput);
@@ -173,14 +199,16 @@ public class nmsAgent {
         }
     }
 
-    public double executeTasks(int taskType, int frequency) throws InterruptedException {
+    public double executeTasks(int taskType, int frequency, int iperfMode, String ip) throws InterruptedException {
         TasksHandler execute = new TasksHandler();
-        return execute.handleTasks(taskType, frequency, "");
+        return execute.handleTasks(taskType, frequency, ip, iperfMode);
     }
 
     public void sendMetrics(NetTask handlerPDU, double taskOutput) {
         lock.lock();
         try {
+            if (taskOutput == 404)
+                return;
             byte[] metricsPDU = handlerPDU.createOutput(taskOutput);
             byte[] metricsUUIDBytes = Arrays.copyOfRange(metricsPDU, 0, 36);
             String metricsUUID = new String(metricsUUIDBytes, StandardCharsets.UTF_8);
