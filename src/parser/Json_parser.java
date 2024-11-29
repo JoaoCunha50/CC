@@ -8,7 +8,9 @@ import org.json.simple.parser.ParseException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 import PDU.NetTask;
 
@@ -19,10 +21,10 @@ public class Json_parser {
         this.file_path = file_path;
     }
 
-    public HashMap<Integer, byte[]> tasks_parser() throws IOException, ParseException {
+    public HashMap<Integer, List<byte[]>> tasks_parser() throws IOException, ParseException {
         JSONParser parser = new JSONParser();
         FileReader reader = null;
-        HashMap<Integer, byte[]> tasksMap = new HashMap<>();
+        HashMap<Integer, List<byte[]>> tasksMap = new HashMap<>(); // Mapeia agent_id -> lista de tarefas (byte[])
 
         try {
             reader = new FileReader(this.file_path);
@@ -30,68 +32,76 @@ public class Json_parser {
 
             for (Object obj : jsonArray) {
                 try {
-                    JSONObject taskJson = (JSONObject) obj;
+                    JSONObject agentJson = (JSONObject) obj;
 
                     // Validar campos obrigatórios
-                    if (taskJson.get("agent_id") == null || taskJson.get("data") == null) {
+                    if (agentJson.get("agent_id") == null || agentJson.get("tasks") == null) {
                         System.err.println("JSON inválido ou faltando campos obrigatórios.");
                         continue;
                     }
 
-                    int agent_id = ((Long) taskJson.get("agent_id")).intValue();
-                    JSONObject dataJson = (JSONObject) taskJson.get("data");
+                    int agent_id = ((Long) agentJson.get("agent_id")).intValue();
+                    JSONArray tasksArray = (JSONArray) agentJson.get("tasks");
 
-                    if (dataJson.get("task_type") == null || dataJson.get("frequency") == null
-                            || dataJson.get("alertflow_condition") == null) {
-                        System.err.println("Dados incompletos na tarefa com agent_id: " + agent_id);
-                        continue;
-                    }
+                    // Inicializar lista para armazenar tarefas do agente
+                    List<byte[]> agentTasks = new ArrayList<>();
 
-                    int task_type = ((Long) dataJson.get("task_type")).intValue();
-                    int frequency = ((Long) dataJson.get("frequency")).intValue();
-                    int alertflow_condition = ((Long) dataJson.get("alertflow_condition")).intValue();
+                    for (Object taskObj : tasksArray) {
+                        try {
+                            JSONObject taskJson = (JSONObject) taskObj;
 
-                    // Campos opcionais
-                    String mode = null;
-                    InetAddress destIpAddress = null;
+                            int task_type = ((Long) taskJson.get("task_type")).intValue();
+                            int frequency = ((Long) taskJson.get("frequency")).intValue();
+                            int alertflow_condition = ((Long) taskJson.get("alertflow_condition")).intValue();
 
-                    if (dataJson.containsKey("mode")) {
-                        mode = (String) dataJson.get("mode");
-                    }
+                            String mode = null;
+                            InetAddress destIpAddress = null;
 
-                    if ("client".equals(mode) && dataJson.containsKey("destination_ip")) {
-                        String destination_ip = (String) dataJson.get("destination_ip");
-                        if (destination_ip != null) {
-                            destIpAddress = InetAddress.getByName(destination_ip);
+                            if (taskJson.containsKey("mode")) {
+                                mode = (String) taskJson.get("mode");
+                            }
+
+                            if ("client".equals(mode) && taskJson.containsKey("destination_ip")) {
+                                String destination_ip = (String) taskJson.get("destination_ip");
+                                if (destination_ip != null) {
+                                    destIpAddress = InetAddress.getByName(destination_ip);
+                                }
+                            } else if ("server".equals(mode)) {
+                                destIpAddress = InetAddress.getByName("0.0.0.0");
+                            }
+
+                            // Exibir informações da tarefa para depuração
+                            System.out.println();
+                            System.out.println("===============================");
+                            System.out.println("Tarefa para agent_id: " + agent_id);
+                            System.out.println("task_type: " + task_type);
+                            System.out.println("frequency: " + frequency);
+                            System.out.println("alertflow_condition: " + alertflow_condition);
+                            System.out.println("mode: " + mode);
+                            System.out.println("destination_ip: " + (destIpAddress != null ? destIpAddress : "Nenhum IP definido"));
+                            System.out.println("===============================");
+                            System.out.println();
+
+                            // Criar tarefa com NetTask
+                            NetTask handler = new NetTask();
+                            byte[] taskPDU = handler.createTaskPDU(
+                                    task_type,
+                                    frequency,
+                                    alertflow_condition,
+                                    InetAddress.getByName("192.168.1.1"),
+                                    destIpAddress,
+                                    "",
+                                    mode);
+
+                            // Adicionar tarefa à lista do agente
+                            agentTasks.add(taskPDU);
+                        } catch (ClassCastException | NullPointerException e) {
+                            System.err.println("Erro ao processar tarefa para agent_id " + agent_id + ": " + e.getMessage());
                         }
-                    } else if ("server".equals(mode)) {
-                        destIpAddress = InetAddress.getByName("0.0.0.0");
-                        
                     }
 
-                    // Debug do conteúdo processado
-                    System.out.println();
-                    System.out.println("===============================");
-                    System.out.println("ESTES SÃO OS DADOS DOS PACOTES");
-                    System.out.println("agent_id: " + agent_id);
-                    System.out.println("task_type: " + task_type);
-                    System.out.println("frequency: " + frequency);
-                    System.out.println("alertflow_condition: " + alertflow_condition);
-                    System.out.println("mode: " + mode);
-                    System.out.println("destination_ip: " + (destIpAddress != null ? destIpAddress : "Nenhum IP definido"));
-                    System.out.println("===============================");
-                    System.out.println();
-
-                    // Criar tarefa com NetTask
-                    NetTask handler = new NetTask();
-                    tasksMap.put(agent_id, handler.createTaskPDU(
-                            task_type,
-                            frequency,
-                            alertflow_condition,
-                            InetAddress.getByName("192.168.1.1"),
-                            destIpAddress,
-                            "",
-                            mode));
+                    // Adicionar lista de tarefas ao mapa com agent_id como chave
+                    tasksMap.put(agent_id, agentTasks);
                 } catch (ClassCastException | NullPointerException e) {
                     System.err.println("Erro ao processar objeto JSON: " + e.getMessage());
                 }
