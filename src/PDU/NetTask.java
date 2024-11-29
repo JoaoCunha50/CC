@@ -4,8 +4,6 @@ import java.io.*;
 import java.net.InetAddress;
 import java.util.UUID;
 
-import javax.print.DocFlavor.STRING;
-
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 

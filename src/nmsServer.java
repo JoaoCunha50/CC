@@ -15,14 +15,17 @@ import parser.Json_parser;
 
 public class nmsServer {
     private DatagramSocket socket;
+    private ServerSocket TCPsocket;
+    private final static int PortaUDP = 12345;
+    private final static int PortaTCP = 1234;
     private Map<Integer, InetSocketAddress> agentRegistry = new ConcurrentHashMap<>();
     private Map<Integer, Thread> agentThreads = new HashMap<>();
-    private final static int PortaUDP = 12345;
     private Map<Integer, byte[]> tasksMap = new ConcurrentHashMap<>();
     SeqManager seqNumbers = new SeqManager();
     private ReentrantLock lock = new ReentrantLock();
 
     public nmsServer() throws IOException {
+        this.TCPsocket = new ServerSocket(PortaTCP);
         this.socket = new DatagramSocket(PortaUDP);
         Json_parser tasks = new Json_parser("src/tasks.json");
         try {
@@ -67,25 +70,25 @@ public class nmsServer {
 
             if (type == NetTask.REGISTER) {
                 // Synchronize the registration process
-                    int agentId = register(clientAddress);
-                    agentRegistry.put(agentId, clientAddress);
-                    seqNumbers.addRegistry(agentId, Byte.toUnsignedInt(data[data.length - 1]));
+                int agentId = register(clientAddress);
+                agentRegistry.put(agentId, clientAddress);
+                seqNumbers.addRegistry(agentId, Byte.toUnsignedInt(data[data.length - 1]));
 
-                    System.out.println(
-                            "[REGISTER RECEIVED] Agent registered: ID = " + agentId + " IP: "
-                                    + clientAddress.getAddress());
+                System.out.println(
+                        "[REGISTER RECEIVED] Agent registered: ID = " + agentId + " IP: "
+                                + clientAddress.getAddress());
 
-                    int seqValue = seqNumbers.getSeqNumber(agentId);
-                    int seqNum = seqNumbers.getNextSeqNum(data, seqValue);
-                    seqNumbers.addToExistingValue(agentId, seqNum);
+                int seqValue = seqNumbers.getSeqNumber(agentId);
+                int seqNum = seqNumbers.getNextSeqNum(data, seqValue);
+                seqNumbers.addToExistingValue(agentId, seqNum);
 
-                    NetTask handler = new NetTask();
-                    byte[] ackPDU = handler.createAckPDU(seqNum);
-                    sendPacket(ackPDU, clientAddress);
+                NetTask handler = new NetTask();
+                byte[] ackPDU = handler.createAckPDU(seqNum);
+                sendPacket(ackPDU, clientAddress);
 
-                    System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentId);
+                System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentId);
 
-                    sendTasks(agentId);
+                sendTasks(agentId);
             }
         } catch (IOException e) {
             System.out.println("Error processing client: " + e.getMessage());
@@ -172,62 +175,59 @@ public class nmsServer {
         return newArray;
     }
 
-    public void receiveMetrics() {
-        lock.lock();
+    private void processMetrics(DatagramPacket packet) {
         try {
-            while (true) {
-                // Recebe os dados e o endereço do cliente com a porta
-                List<Object> receivedData = receivePacket();
-                byte[] defaultBuffer = (byte[]) receivedData.get(0);
-                InetSocketAddress clientSocketAddress = (InetSocketAddress) receivedData.get(1);
+            byte[] dataEntry = packet.getData();
+            byte[] data = Arrays.copyOfRange(dataEntry, 0, 38);
+            InetSocketAddress clientAddress = new InetSocketAddress(packet.getAddress(), packet.getPort());
 
-                if (defaultBuffer.length > 0) {
-                    byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 38);
+            byte[] bufferTemp = Arrays.copyOfRange(dataEntry, 0, 38);
+            String pduUUID = new String(Arrays.copyOfRange(bufferTemp, 0, 36), StandardCharsets.UTF_8);
+            int type = Byte.toUnsignedInt(bufferTemp[36]);
+            double output = Byte.toUnsignedInt(bufferTemp[37]);
 
-                    byte[] pduUUIDBytes = Arrays.copyOfRange(bufferTemp, 0, 36);
-                    String pduUUID = new String(pduUUIDBytes, StandardCharsets.UTF_8);
+            if (type == NetTask.METRICS) {
+                System.out.println("[METRICS RECEIVED] Task Output received:");
+                System.out.println("     taskUUID: " + pduUUID);
+                System.out.println("     metrics:  " + output);
+                System.out.println();
 
-                    int type = Byte.toUnsignedInt(bufferTemp[36]);
-                    double output = Byte.toUnsignedInt(bufferTemp[37]);
-
-                    if (type == NetTask.METRICS) {
-                        System.out.println("[METRICS RECEIVED] Task Output received:");
-                        System.out.println("     taskUUID: " + pduUUID);
-                        System.out.println("     metrics:  " + output);
-                        System.out.println();
-
-                        NetTask handler = new NetTask();
-                        byte[] ackPDU = handler.createAckPDU(10);
-                        sendPacket(ackPDU, clientSocketAddress);
-                        System.out.println("[ACK SENT] Acknowledgement sent to agent.");
-                    }
-                }
+                NetTask handler = new NetTask();
+                byte[] ackPDU = handler.createAckPDU(10);
+                sendPacket(ackPDU, clientAddress);
+                System.out.println("[ACK SENT] Acknowledgement sent to agent.");
             }
         } catch (IOException e) {
-            System.out.println("Error receiving tasks: " + e.getMessage());
-        } finally {
-            lock.unlock();
+            System.out.println("Error processing metrics: " + e.getMessage());
         }
     }
 
     public void start() {
         System.out.println("Server started, waiting for packets...");
 
-        // Start a separate thread for receiving metrics
-        Thread metricsThread = new Thread(this::receiveMetrics);
-        metricsThread.start();
-
+        // Enquanto o servidor estiver rodando, fica aguardando pacotes de agentes
         while (true) {
             try {
                 DatagramPacket packet = new DatagramPacket(new byte[1024], 1024);
                 socket.receive(packet);
 
-                Thread agentThread = new Thread(() -> {
-                    handleClient(packet);
-                });
-                int threadId = agentRegistry.size() + 1;
-                agentThreads.put(threadId, agentThread);
-                agentThread.start();
+                // Verifica o tipo do pacote (tarefa ou métrica)
+                byte[] data = Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
+                int type = Byte.toUnsignedInt(data[data.length - 2]); // Assume que o tipo está nos 2 últimos bytes
+
+                // Se for uma métrica, processa
+                if (type == NetTask.METRICS) {
+                    processMetrics(packet);
+                } else {
+                    // Caso contrário, trata como uma requisição normal de tarefa
+                    Thread agentThread = new Thread(() -> {
+                        handleClient(packet);
+                    });
+
+                    int threadId = agentRegistry.size() + 1;
+                    agentThreads.put(threadId, agentThread);
+                    agentThread.start();
+                }
 
             } catch (IOException e) {
                 System.out.println("[ERROR] Server error: " + e.getMessage());

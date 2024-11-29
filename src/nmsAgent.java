@@ -13,6 +13,7 @@ import PDU.NetTask;
 
 public class nmsAgent {
     private DatagramSocket socket;
+    private Socket TCPSocket;
     private InetAddress serverAddress;
     private int serverPort;
     private ExecutorService agentExecutor;
@@ -23,6 +24,7 @@ public class nmsAgent {
         this.serverAddress = InetAddress.getByName(servidorIP);
         this.serverPort = porta;
         this.socket = new DatagramSocket(); // Usa uma porta dinâmica para envio
+        this.TCPSocket = new Socket();
         this.agentExecutor = Executors.newFixedThreadPool(2);
         this.seqnum_atual = 1;
         this.lock = new ReentrantLock();
@@ -40,6 +42,15 @@ public class nmsAgent {
         return Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
     }
 
+    public boolean waitForAck(int type, int ackValue, byte[] pdu) {
+        if (type == NetTask.ACKNOWLEDGE && ackValue == (seqnum_atual + pdu.length)) {
+            seqnum_atual = ackValue;
+            System.out.println("[ACK RECEIVED] ACK received. Register successful.\n");
+            return true;
+        } else
+            return false;
+    }
+
     public void register() {
         try {
             NetTask handler = new NetTask();
@@ -52,11 +63,7 @@ public class nmsAgent {
             if (response != null && response.length > 0) {
                 int typeInt = Byte.toUnsignedInt(response[response.length - 2]);
                 int ackInt = Byte.toUnsignedInt(response[response.length - 1]);
-
-                if (typeInt == NetTask.ACKNOWLEDGE && ackInt == (seqnum_atual + registerPDU.length)) {
-                    seqnum_atual = ackInt;
-                    System.out.println("[ACK RECEIVED] ACK received. Register successful.\n");
-                }
+                waitForAck(typeInt, ackInt, registerPDU);
             }
         } catch (IOException e) {
             System.out.println("[REGISTER TIMEOUT] Register failed. Re-sending...\n" + e.getMessage());
@@ -120,29 +127,42 @@ public class nmsAgent {
                         }
                         retries++;
                     }
+                    if (freq != 0) {
+                        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
-                    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+                        Runnable task = () -> {
+                            try {
+                                NetTask handlerPDU = new NetTask();
+                                double taskOutput = -1;
 
-                    Runnable task = () -> {
-                        try {
-                            NetTask handlerPDU = new NetTask();
-                            double taskOutput = -1;
+                                // Executa a tarefa
+                                taskOutput = executeTasks(taskType, freq);
 
-                            // Executa a tarefa
-                            taskOutput = executeTasks(taskType, freq);
-
-                            if (taskOutput > threshold) {
-                                System.out.println("[ALERTFLOW] Metric is above threshold");
-                            } else {
-                                sendMetrics(handlerPDU, taskOutput);
+                                if (taskOutput > threshold) {
+                                    System.out.println("[ALERTFLOW] Metric is above threshold");
+                                } else {
+                                    sendMetrics(handlerPDU, taskOutput);
+                                }
+                            } catch (InterruptedException e) {
+                                System.err.println("[ERROR] Task execution was interrupted: " + e.getMessage());
+                                Thread.currentThread().interrupt(); // Restaura o estado de interrupção da thread
                             }
-                        } catch (InterruptedException e) {
-                            System.err.println("[ERROR] Task execution was interrupted: " + e.getMessage());
-                            Thread.currentThread().interrupt(); // Restaura o estado de interrupção da thread
+                        };
+                        // Agenda a tarefa com frequência definida
+                        scheduler.scheduleAtFixedRate(task, 0, freq, TimeUnit.SECONDS);
+                    } else {
+                        NetTask handlerPDU = new NetTask();
+                        double taskOutput = -1;
+
+                        // Executa a tarefa
+                        taskOutput = executeTasks(taskType, freq);
+
+                        if (taskOutput > threshold) {
+                            System.out.println("[ALERTFLOW] Metric is above threshold");
+                        } else {
+                            sendMetrics(handlerPDU, taskOutput);
                         }
-                    };
-                    // Agenda a tarefa com frequência definida
-                    scheduler.scheduleAtFixedRate(task, 0, freq, TimeUnit.SECONDS);
+                    }
 
                 } else {
                     Thread.sleep(100);
