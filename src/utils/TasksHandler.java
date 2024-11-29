@@ -3,13 +3,14 @@ package utils;
 import com.sun.management.OperatingSystemMXBean;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
 
 public class TasksHandler {
 
-    public double handleTasks(int task, int frequency, String ip) throws InterruptedException {
-        double output = 0;
+    public double handleTasks(int task, int frequency, String ip, int mode) throws InterruptedException {
+        double output = 404;
 
         switch (task) {
             case 0:
@@ -18,6 +19,13 @@ public class TasksHandler {
                 return measureRAMusage();
             case 2:
                 return pingTask(ip);
+            case 3:
+                if (mode == 1) {
+                    createIperfServer();
+                    System.out.println("tou a abrir");
+                } else if (mode == 0) {
+                    return getIperfBandwidth(ip);
+                }
             default:
                 return output;
         }
@@ -121,4 +129,72 @@ public class TasksHandler {
 
         return avgValue;
     }
+
+    private static void createIperfServer() {
+        String command = "iperf -s"; // Pode usar "iperf -s" ou "iperf3 -s" dependendo da versão
+        try {
+            // Usando o ProcessBuilder para rodar o comando no sistema operacional
+            ProcessBuilder builder = new ProcessBuilder(command.split(" "));
+
+            // Redireciona a saída do processo para null (sem output no console)
+            builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+            builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+
+            // Inicia o processo em segundo plano
+            Process process = builder.start();
+
+            System.out.println("Servidor IPERF iniciado em segundo plano!");
+
+            // Não aguarda o processo para não bloquear a execução
+            // process.waitFor(); // Remover esta linha
+
+        } catch (IOException e) {
+            System.err.println("Erro ao executar o comando: " + e.getMessage());
+        }
+    }
+
+    private static double getIperfBandwidth(String serverIp) {
+        String command = "iperf -c " + serverIp + " -t 10 -f m"; // "-f m" para exibir a largura de banda em Mbps
+        double bandwidth = -1.0; // Valor inicial negativo indicando que a largura de banda não foi encontrada.
+
+        try {
+            // Usando o ProcessBuilder para rodar o comando no sistema operacional
+            ProcessBuilder builder = new ProcessBuilder(command.split(" "));
+
+            // Captura a saída do processo
+            Process process = builder.start();
+
+            // Ler a saída do processo e procurar pela linha que contém a largura de banda
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+
+            while ((line = reader.readLine()) != null) {
+                if (line.contains("Mbits/sec")) { // A linha com a largura de banda contém "Mbits/sec"
+                    // Encontrando a largura de banda na linha
+                    String[] parts = line.split("\\s+");
+                    String bandwidthStr = parts[parts.length - 2]; // Largura de banda geralmente está na penúltima
+                                                                   // posição
+
+                    try {
+                        // Convertendo para double
+                        bandwidth = Double.parseDouble(bandwidthStr);
+                    } catch (NumberFormatException e) {
+                        System.err.println("Erro ao converter a largura de banda: " + e.getMessage());
+                    }
+                    break;
+                }
+            }
+
+            process.waitFor();
+
+        } catch (IOException e) {
+            System.err.println("Erro ao executar o comando: " + e.getMessage());
+        } catch (InterruptedException e) {
+            System.err.println("O processo foi interrompido: " + e.getMessage());
+        }
+        System.out.println("A largura de banda é: " + bandwidth);
+
+        return bandwidth;
+    }
+
 }

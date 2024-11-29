@@ -8,10 +8,7 @@ import org.json.simple.parser.ParseException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.time.LocalTime;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
 import PDU.NetTask;
 
@@ -35,7 +32,7 @@ public class Json_parser {
                 try {
                     JSONObject taskJson = (JSONObject) obj;
 
-                    // Validar se os campos necessários estão presentes
+                    // Validar campos obrigatórios
                     if (taskJson.get("agent_id") == null || taskJson.get("data") == null) {
                         System.err.println("JSON inválido ou faltando campos obrigatórios.");
                         continue;
@@ -54,6 +51,37 @@ public class Json_parser {
                     int frequency = ((Long) dataJson.get("frequency")).intValue();
                     int alertflow_condition = ((Long) dataJson.get("alertflow_condition")).intValue();
 
+                    // Campos opcionais
+                    String mode = null;
+                    InetAddress destIpAddress = null;
+
+                    if (dataJson.containsKey("mode")) {
+                        mode = (String) dataJson.get("mode");
+                    }
+
+                    if ("client".equals(mode) && dataJson.containsKey("destination_ip")) {
+                        String destination_ip = (String) dataJson.get("destination_ip");
+                        if (destination_ip != null) {
+                            destIpAddress = InetAddress.getByName(destination_ip);
+                        }
+                    } else if ("server".equals(mode)) {
+                        destIpAddress = InetAddress.getByName("0.0.0.0");
+                        
+                    }
+
+                    // Debug do conteúdo processado
+                    System.out.println();
+                    System.out.println("===============================");
+                    System.out.println("ESTES SÃO OS DADOS DOS PACOTES");
+                    System.out.println("agent_id: " + agent_id);
+                    System.out.println("task_type: " + task_type);
+                    System.out.println("frequency: " + frequency);
+                    System.out.println("alertflow_condition: " + alertflow_condition);
+                    System.out.println("mode: " + mode);
+                    System.out.println("destination_ip: " + (destIpAddress != null ? destIpAddress : "Nenhum IP definido"));
+                    System.out.println("===============================");
+                    System.out.println();
+
                     // Criar tarefa com NetTask
                     NetTask handler = new NetTask();
                     tasksMap.put(agent_id, handler.createTaskPDU(
@@ -61,8 +89,9 @@ public class Json_parser {
                             frequency,
                             alertflow_condition,
                             InetAddress.getByName("192.168.1.1"),
-                            InetAddress.getByName("192.168.1.1"),
-                            null));
+                            destIpAddress,
+                            "",
+                            mode));
                 } catch (ClassCastException | NullPointerException e) {
                     System.err.println("Erro ao processar objeto JSON: " + e.getMessage());
                 }
@@ -79,5 +108,4 @@ public class Json_parser {
 
         return tasksMap;
     }
-
 }
