@@ -191,8 +191,8 @@ public class nmsServer {
 
     private void processMetrics(DatagramPacket packet) {
         try {
+            NetTask handler = new NetTask();
             byte[] dataEntry = packet.getData();
-            byte[] data = Arrays.copyOfRange(dataEntry, 0, 38);
             InetSocketAddress clientAddress = new InetSocketAddress(packet.getAddress(), packet.getPort());
 
             byte[] bufferTemp = Arrays.copyOfRange(dataEntry, 0, 38);
@@ -200,20 +200,29 @@ public class nmsServer {
             int type = Byte.toUnsignedInt(bufferTemp[36]);
             double output = Byte.toUnsignedInt(bufferTemp[37]);
 
+            Integer agentID = agentRegistry.entrySet().stream()
+                    .filter(entry -> entry.getValue().equals(clientAddress))
+                    .map(Map.Entry::getKey)
+                    .findFirst()
+                    .orElse(null);
+
             if (type == NetTask.METRICS) {
+                int seq_updated = seqNumbers.getNextSeqNum(bufferTemp, seqNumbers.getSeqNumber(agentID));
+                seqNumbers.addToExistingValue(agentID, seq_updated);
+                System.out.println(seq_updated);
+                byte[] ackPDU = handler.createAckPDU(seq_updated);
+                int retries = 0;
+                while (retries < 3) {
+                    sendPacket(ackPDU, clientAddress);
+                    retries++;
+                }
+
                 System.out.println("[METRICS RECEIVED] Task Output received:");
                 System.out.println("     taskUUID: " + pduUUID);
                 System.out.println("     metrics:  " + output);
                 System.out.println();
 
-                int ID = getIDfromIP(clientAddress);
-                String agentID = "agent" + ID;
-                saveMetricsToJson(agentID, pduUUID, output);
-
-                NetTask handler = new NetTask();
-                byte[] ackPDU = handler.createAckPDU(10);
-                sendPacket(ackPDU, clientAddress);
-                System.out.println("[ACK SENT] Acknowledgement sent to agent.");
+                System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
             }
         } catch (IOException e) {
             System.out.println("Error processing metrics: " + e.getMessage());

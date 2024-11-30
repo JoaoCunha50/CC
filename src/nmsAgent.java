@@ -45,7 +45,6 @@ public class nmsAgent {
     public boolean waitForAck(int type, int ackValue, byte[] pdu) {
         if (type == NetTask.ACKNOWLEDGE && ackValue == (seqnum_atual + pdu.length)) {
             seqnum_atual = ackValue;
-            System.out.println("[ACK RECEIVED] ACK received. Register successful.\n");
             return true;
         } else
             return false;
@@ -63,7 +62,9 @@ public class nmsAgent {
             if (response != null && response.length > 0) {
                 int typeInt = Byte.toUnsignedInt(response[response.length - 2]);
                 int ackInt = Byte.toUnsignedInt(response[response.length - 1]);
-                waitForAck(typeInt, ackInt, registerPDU);
+                if (waitForAck(typeInt, ackInt, registerPDU)) {
+                    System.out.println("[ACK RECEIVED] ACK received. Register successful.\n");
+                }
             }
         } catch (IOException e) {
             System.out.println("[REGISTER TIMEOUT] Register failed. Re-sending...\n" + e.getMessage());
@@ -203,25 +204,57 @@ public class nmsAgent {
     }
 
     public void sendMetrics(NetTask handlerPDU, double taskOutput) {
-        lock.lock();
         try {
             if (taskOutput == 404)
                 return;
+    
             byte[] metricsPDU = handlerPDU.createOutput(taskOutput);
             byte[] metricsUUIDBytes = Arrays.copyOfRange(metricsPDU, 0, 36);
             String metricsUUID = new String(metricsUUIDBytes, StandardCharsets.UTF_8);
-            sendByteArray(metricsPDU);
+            boolean ackReceived = false;
+            int retryCount = 0;
+            int maxRetries = 3; // Número máximo de tentativas
+            int retryDelay = 5000; // Tempo de espera entre tentativas (em milissegundos)
+    
             System.out.println("[METRICS SENT] Task Output sent.");
             System.out.println("     taskUUID: " + metricsUUID);
             System.out.println("     metrics:  " + taskOutput);
             System.out.println();
+            sendByteArray(metricsPDU);
+    
+            while (!ackReceived) {
+                try {
+                    byte[] ackPDU = receiveByteArray();
+                    if (ackPDU != null && ackPDU.length > 0) {
+                        int typeInt = Byte.toUnsignedInt(ackPDU[ackPDU.length - 2]);
+                        int ackInt = Byte.toUnsignedInt(ackPDU[ackPDU.length - 1]);
+    
+                        if (waitForAck(typeInt, ackInt, metricsPDU)) {
+                            ackReceived = true;
+                            System.out.println("[ACK RECEIVED] Acknowledgment received successfully.");
+                        } else if(!waitForAck(typeInt, ackInt, metricsPDU)) {
+                            System.out.println(metricsPDU.length);
+                            System.out.println("[ACK FAILED] Received invalid ACK. Retrying...");
+                            System.out.println("SeqNum: " + ackInt);
+                        }
+                    } else {
+                        System.out.println("[ACK TIMEOUT] No acknowledgment received. Retrying...");
+                        Thread.sleep(100);
+                    }
+                } catch (IOException | InterruptedException e) {
+                    System.out.println("[ERROR] Failed to receive acknowledgment: " + e.getMessage());
+                }
+            }
+    
+            if (!ackReceived) {
+                System.out.println("[ERROR] Failed to receive acknowledgment after " + maxRetries + " retries.");
+            }
         } catch (IOException e) {
-            System.err.println("[ERROR] Task execution was interrupted: " + e.getMessage());
-            Thread.currentThread().interrupt(); // Restaura o estado de interrupção da thread
-        } finally {
-            lock.unlock();
+            System.out.println("[ERROR] Task execution was interrupted: " + e.getMessage());
+            Thread.currentThread().interrupt(); // Restaure o estado de interrupção da thread
         }
     }
+    
 
     public void closeConnection() {
         if (socket != null) {
