@@ -1,6 +1,7 @@
 # Define the source and output directories
 SRC_DIR = src
 BIN_DIR = bin
+MET_DIR = metrics
 LIB_DIR = dependencies
 LIBRARY = $(LIB_DIR)/json-simple-1.1.1.jar
 
@@ -40,7 +41,7 @@ $(BIN_DIR)/nmsServer.class: $(SRC_DIR)/nmsServer.java
 
 # Clean target to remove compiled classes
 clean:
-	rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR) $(MET_DIR)
 
 # Run the program
 agent:

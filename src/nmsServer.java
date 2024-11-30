@@ -1,6 +1,8 @@
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -8,6 +10,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
+
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 
 import utils.*;
 import PDU.NetTask;
@@ -123,17 +129,17 @@ public class nmsServer {
         InetSocketAddress clientAddress = agentRegistry.get(agentID);
         for (byte[] task : taskPDUs) {
             int newSeq = seqNumbers.getSeqNumber(agentID); // Obter número de sequência para o agente
-    
+
             // Inserir número de sequência no pacote
             byte[] completeTask = insertSeqNumber(task, (byte) newSeq);
-    
+
             // Enviar tarefa
             sendPacket(completeTask, clientAddress);
             System.out.println("[TASK SENT] Task sent to agent " + agentID);
-    
+
             boolean ackReceived = false;
             int retries = 0;
-    
+
             // Loop de retransmissão até receber ACK ou atingir limite de tentativas
             while (!ackReceived && retries < 3) {
                 try {
@@ -141,12 +147,12 @@ public class nmsServer {
                     List<Object> receivedData = receivePacket();
                     byte[] response = (byte[]) receivedData.get(0); // Dados do pacote
                     InetSocketAddress clientSocketAddress = (InetSocketAddress) receivedData.get(1);
-    
+
                     if (response != null && response.length > 0) {
                         // Extração do tipo e valor do ACK
                         int typeInt = Byte.toUnsignedInt(response[response.length - 2]);
                         int ackValue = Byte.toUnsignedInt(response[response.length - 1]);
-    
+
                         // Verificar se o pacote é um ACK e se o valor do ACK é válido
                         if (typeInt == NetTask.ACKNOWLEDGE && ackValue == newSeq + completeTask.length) {
                             seqNumbers.addToExistingValue(agentID, ackValue); // Atualizar número de sequência
@@ -161,14 +167,13 @@ public class nmsServer {
                     sendPacket(completeTask, clientAddress); // Reenviar tarefa
                 }
             }
-    
+
             // Verificar se falhou após 3 tentativas
             if (!ackReceived) {
                 System.out.println("[FAILED] Failed to receive ACK from agent " + agentID + " after 3 attempts");
             }
         }
     }
-    
 
     public static byte[] insertSeqNumber(byte[] originalArray, byte seqNumber) {
         int uuidLength = 36;
@@ -201,6 +206,10 @@ public class nmsServer {
                 System.out.println("     metrics:  " + output);
                 System.out.println();
 
+                int ID = getIDfromIP(clientAddress);
+                String agentID = "agent" + ID;
+                saveMetricsToJson(agentID, pduUUID, output);
+
                 NetTask handler = new NetTask();
                 byte[] ackPDU = handler.createAckPDU(10);
                 sendPacket(ackPDU, clientAddress);
@@ -209,6 +218,68 @@ public class nmsServer {
         } catch (IOException e) {
             System.out.println("Error processing metrics: " + e.getMessage());
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    public void saveMetricsToJson(String agentName, String taskUUID, double metrics) {
+        try {
+            String metricsDir = "metrics";
+            String filePath = metricsDir + "/metrics.json";
+
+            // Cria o diretório, caso não exista
+            File directory = new File(metricsDir);
+            if (!directory.exists()) {
+                directory.mkdir();
+            }
+
+            // Cria um objeto JSON para armazenar os dados
+            JSONObject existingData = new JSONObject();
+
+            // Tenta ler o conteúdo existente no arquivo
+            File jsonFile = new File(filePath);
+            if (jsonFile.exists()) {
+                // Lê o conteúdo do arquivo JSON
+                String content = new String(Files.readAllBytes(Paths.get(filePath)), StandardCharsets.UTF_8);
+                if (!content.isBlank()) {
+                    // Parse o conteúdo como um JSONObject
+                    existingData = (JSONObject) JSONValue.parse(content);
+                }
+            }
+
+            // Verifica se já existe uma lista de tasks para o agente
+            JSONArray taskList = (JSONArray) existingData.get(agentName);
+            if (taskList == null) {
+                taskList = new JSONArray(); // Se não existir, cria uma nova lista
+            }
+
+            // Cria um objeto JSON para a nova task
+            JSONObject task = new JSONObject();
+            task.put("taskUUID", taskUUID);
+            task.put("metrics", metrics);
+
+            // Adiciona a nova task na lista do agente
+            taskList.add(task);
+
+            // Atualiza a lista de tasks no objeto JSON do agente
+            existingData.put(agentName, taskList);
+
+            // Escreve o JSON atualizado no arquivo
+            try (FileWriter writer = new FileWriter(filePath)) {
+                writer.write(existingData.toJSONString());
+            }
+
+        } catch (Exception e) {
+            System.err.println("Erro ao guardar as métricas no JSON: " + e.getMessage());
+        }
+    }
+
+    public Integer getIDfromIP(InetSocketAddress value) {
+        for (Map.Entry<Integer, InetSocketAddress> entry : agentRegistry.entrySet()) {
+            if (entry.getValue().equals(value)) {
+                return entry.getKey(); // Retorna a chave correspondente ao valor
+            }
+        }
+        return null; // Retorna null se o valor não for encontrado
     }
 
     public void start() {
