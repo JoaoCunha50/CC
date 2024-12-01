@@ -104,7 +104,7 @@ public class nmsAgent {
 
                 if (defaultBuffer.length > 0 && type == NetTask.TASK) {
                     byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 41); // o bufferTemp[36] é o type da
-                                                                                  // mensagem!
+                    // mensagem!
                     int taskType = Byte.toUnsignedInt(bufferTemp[40]);
                     byte[] ackBytes = Arrays.copyOfRange(bufferTemp, bufferTemp.length - 4, bufferTemp.length);
                     int seqNum = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
@@ -123,13 +123,18 @@ public class nmsAgent {
                         case 3:
                         case 4:
                         case 5:
-                            byte[] nextThreeBytes = Arrays.copyOfRange(defaultBuffer, 39, 42);
+                            byte[] nextThreeBytes = Arrays.copyOfRange(defaultBuffer, 41, 44); // tive de aumentar pois
+                                                                                               // demos mais bytes ao
+                                                                                               // seq
                             byte iperfMode = nextThreeBytes[2];
                             if (iperfMode == 1) {
                                 payloadLength = 3;
                             } else if (iperfMode == 0) {
                                 payloadLength = 7;
                             }
+                            break;
+                        case 6:
+                            payloadLength = 6;
                             break;
                         default:
                             payloadLength = 0;
@@ -142,6 +147,14 @@ public class nmsAgent {
                     String pduUUID = new String(pduUUIDBytes, StandardCharsets.UTF_8);
                     int freq = Byte.toUnsignedInt(bufferPayload[0]);
                     int threshold = Byte.toUnsignedInt(bufferPayload[1]);
+
+                    final String interfaceName;
+                    if (taskType == 6) {
+                        byte[] interfaceNameBytes = Arrays.copyOfRange(bufferPayload, 2, 6);
+                        interfaceName = new String(interfaceNameBytes);
+                    } else
+                        interfaceName = "";
+
                     final int iperfMode;
                     if (taskType == 3 || taskType == 4 || taskType == 5) {
                         iperfMode = Byte.toUnsignedInt(bufferPayload[2]);
@@ -188,7 +201,7 @@ public class nmsAgent {
                                 double taskOutput = -1;
 
                                 // Executa a tarefa
-                                taskOutput = executeTasks(taskType, freq, iperfMode, destIP);
+                                taskOutput = executeTasks(taskType, freq, iperfMode, destIP, interfaceName);
 
                                 if (taskOutput > threshold && taskOutput != 404) {
                                     sendAlert(handlerAlerts, taskOutput, taskType, threshold, seqnum_atual);
@@ -208,7 +221,7 @@ public class nmsAgent {
                         double taskOutput = -1;
 
                         // Executa a tarefa
-                        taskOutput = executeTasks(taskType, freq, iperfMode, destIP);
+                        taskOutput = executeTasks(taskType, freq, iperfMode, destIP, interfaceName);
 
                         if (taskOutput > threshold && taskOutput != 404) {
                             sendAlert(handlerAlerts, taskOutput, taskType, threshold, seqnum_atual);
@@ -226,9 +239,10 @@ public class nmsAgent {
         }
     }
 
-    public double executeTasks(int taskType, int frequency, int iperfMode, String ip) throws InterruptedException {
+    public double executeTasks(int taskType, int frequency, int iperfMode, String ip, String interfaceName)
+            throws InterruptedException {
         TasksHandler execute = new TasksHandler();
-        return execute.handleTasks(taskType, frequency, ip, iperfMode);
+        return execute.handleTasks(taskType, frequency, ip, iperfMode, interfaceName);
     }
 
     public void sendMetrics(NetTask handlerPDU, double taskOutput, int taskType) {

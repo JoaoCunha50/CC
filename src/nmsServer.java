@@ -221,7 +221,6 @@ public class nmsServer {
             NetTask handler = new NetTask();
             byte[] dataEntry = packet.getData();
             InetSocketAddress clientAddress = new InetSocketAddress(packet.getAddress(), packet.getPort());
-            System.out.println(clientAddress.toString());
 
             byte[] bufferTemp = Arrays.copyOfRange(dataEntry, 0, 39);
             String pduUUID = new String(Arrays.copyOfRange(bufferTemp, 0, 36), StandardCharsets.UTF_8);
@@ -246,7 +245,9 @@ public class nmsServer {
                 }
 
                 System.out.println("[METRICS RECEIVED] Task Output received:");
+                System.out.println("     agentID:  " + agentID);
                 System.out.println("     taskUUID: " + pduUUID);
+                System.out.println("     taskType: " + taskType);
                 System.out.println("     metrics:  " + output);
                 System.out.println("     task_type:  " + taskType);
                 System.out.println();
@@ -255,6 +256,7 @@ public class nmsServer {
 
                 String agentID_String = "agent" + agentID;
                 OutputHandler.saveMetricsToJson(agentID_String, pduUUID, output, taskType);
+
             }
         } catch (IOException e) {
             System.out.println("Error processing metrics: " + e.getMessage());
