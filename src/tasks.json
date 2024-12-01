@@ -3,14 +3,14 @@
         "agent_id": 1,
         "tasks": [
             {
-                "task_type": 4,
+                "task_type": 5,
                 "frequency": 0,
                 "alertflow_condition": 100,
                 "mode": "server"
             },
             {
                 "task_type": 1,
-                "frequency": 5,
+                "frequency": 15,
                 "alertflow_condition": 200
             }
         ]
@@ -19,8 +19,8 @@
         "agent_id": 2,
         "tasks": [
             {
-                "task_type": 4,
-                "frequency": 0,
+                "task_type": 5,
+                "frequency": 10,
                 "alertflow_condition": 100,
                 "mode": "client",
                 "destination_ip": "10.0.3.10"
