@@ -4,8 +4,8 @@
         "tasks": [
             {
                 "task_type": 1,
-                "frequency": 15,
-                "alertflow_condition": 200
+                "frequency": 3,
+                "alertflow_condition": 0
             }
         ]
     },

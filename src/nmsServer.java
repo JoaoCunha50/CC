@@ -2,8 +2,6 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,11 +10,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.JSONValue;
-
 import utils.*;
+import PDU.AlertFlow;
 import PDU.NetTask;
 import parser.Json_parser;
 
@@ -60,6 +55,21 @@ public class nmsServer {
 
         // Retorna dados e InetSocketAddress
         return Arrays.asList(data, new InetSocketAddress(clientAddress, clientPort));
+    }
+
+    private void handleTCPClient(Socket clientSocket) {
+        try (InputStream input = clientSocket.getInputStream()) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = input.read(buffer)) != -1) {
+                if (bytesRead > 0) {
+                    byte[] data = Arrays.copyOf(buffer, bytesRead);
+                    processAlerts(data, clientSocket);
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("[ERROR] Error handling TCP client: " + e.getMessage());
+        }
     }
 
     private void handleClient(DatagramPacket packet) {
@@ -234,15 +244,18 @@ public class nmsServer {
                     retries++;
                 }
 
-                String agentID_String = "agent" + agentID;
-                saveMetricsToJson(agentID_String, pduUUID, output, taskType);
-
                 System.out.println("[METRICS RECEIVED] Task Output received:");
                 System.out.println("     agentID:  " + agentID);
                 System.out.println("     taskUUID: " + pduUUID);
                 System.out.println("     taskType: " + taskType);
                 System.out.println("     metrics:  " + output);
+                System.out.println("     task_type:  " + taskType);
                 System.out.println();
+
+                System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
+
+                String agentID_String = "agent" + agentID;
+                OutputHandler.saveMetricsToJson(agentID_String, pduUUID, output, taskType);
 
             }
         } catch (IOException e) {
@@ -250,58 +263,55 @@ public class nmsServer {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    public void saveMetricsToJson(String agentName, String taskUUID, double metrics, int taskType) {
+    private void processAlerts(byte[] dataEntry, Socket clientSocket) {
         try {
-            String metricsDir = "metrics";
-            String filePath = metricsDir + "/metrics.json";
+            NetTask handler = new NetTask();
+            OutputStream output = clientSocket.getOutputStream();
 
-            // Cria o diretório, caso não exista
-            File directory = new File(metricsDir);
-            if (!directory.exists()) {
-                directory.mkdir();
+            // Extrai informações do PDU
+            byte[] bufferTemp = Arrays.copyOfRange(dataEntry, 0, 43);
+            String pduUUID = new String(Arrays.copyOfRange(bufferTemp, 0, 36), StandardCharsets.UTF_8);
+            int type = Byte.toUnsignedInt(bufferTemp[36]);
+            byte[] ackBytes = Arrays.copyOfRange(bufferTemp, 37, 40);
+            int seqnum = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
+            int taskType = Byte.toUnsignedInt(bufferTemp[40]);
+            int threshold = Byte.toUnsignedInt(bufferTemp[41]);
+            double outputMetric = Byte.toUnsignedInt(bufferTemp[42]);
+
+            if (taskType == 5) {
+                outputMetric /= 10; // Normaliza o valor, se necessário
             }
+            InetAddress clientAdress = clientSocket.getInetAddress();
 
-            // Cria um objeto JSON para armazenar os dados
-            JSONObject existingData = new JSONObject();
+            int agentID = getIDfromTCPIP(clientAdress);
 
-            // Tenta ler o conteúdo existente no arquivo
-            File jsonFile = new File(filePath);
-            if (jsonFile.exists()) {
-                // Lê o conteúdo do arquivo JSON
-                String content = new String(Files.readAllBytes(Paths.get(filePath)), StandardCharsets.UTF_8);
-                if (!content.isBlank()) {
-                    // Parse o conteúdo como um JSONObject
-                    existingData = (JSONObject) JSONValue.parse(content);
-                }
+            // Processa alertas
+            if (type == AlertFlow.ALERT) {
+                int seqUpdated = seqNumbers.getNextSeqNum(bufferTemp, seqnum);
+                seqNumbers.addToExistingValue(agentID, seqUpdated);
+
+                // Cria o ACK
+                byte[] ackPDU = handler.createAckPDU(seqUpdated);
+
+                // Envia o ACK pelo TCP
+                output.write(ackPDU);
+                output.flush();
+
+                // Exibe e salva as métricas
+                System.out.println("[ALERTFLOW] TASK OUTPUT EXCEEDED THRESHOLD:");
+                System.out.println("     taskUUID: " + pduUUID);
+                System.out.println("     metrics:  " + outputMetric);
+                System.out.println("     threshold:  " + threshold);
+                System.out.println("     task_type:  " + taskType);
+                System.out.println();
+
+                System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
+
+                String agentID_String = "agent" + agentID;
+                OutputHandler.saveMetricsToJson(agentID_String, pduUUID, outputMetric, taskType);
             }
-
-            // Verifica se já existe uma lista de tasks para o agente
-            JSONArray taskList = (JSONArray) existingData.get(agentName);
-            if (taskList == null) {
-                taskList = new JSONArray(); // Se não existir, cria uma nova lista
-            }
-
-            // Cria um objeto JSON para a nova task, incluindo taskType, taskUUID e metrics
-            // na ordem correta
-            JSONObject task = new JSONObject();
-            task.put("taskType", taskType); // Adiciona o taskType
-            task.put("metrics", metrics); // Adiciona as métricas
-            task.put("taskUUID", taskUUID); // Adiciona o taskUUID
-
-            // Adiciona a nova task na lista do agente
-            taskList.add(task);
-
-            // Atualiza a lista de tasks no objeto JSON do agente
-            existingData.put(agentName, taskList);
-
-            // Escreve o JSON atualizado no arquivo
-            try (FileWriter writer = new FileWriter(filePath)) {
-                writer.write(existingData.toJSONString());
-            }
-
-        } catch (Exception e) {
-            System.err.println("Erro ao guardar as métricas no JSON: " + e.getMessage());
+        } catch (IOException e) {
+            System.out.println("[ERROR] Error processing alert: " + e.getMessage());
         }
     }
 
@@ -314,10 +324,31 @@ public class nmsServer {
         return null; // Retorna null se o valor não for encontrado
     }
 
+    public Integer getIDfromTCPIP(InetAddress value) {
+        for (Map.Entry<Integer, InetSocketAddress> entry : agentRegistry.entrySet()) {
+            if (entry.getValue().getAddress().equals(value)) {
+                return entry.getKey(); // Retorna a chave correspondente ao valor
+            }
+        }
+        return null; // Retorna null se o valor não for encontrado
+    }
+
     public void start() {
         System.out.println("Server started, waiting for packets...");
         System.out.println("UDP Port: " + PortaUDP);
         System.out.println("TCP Port: " + PortaTCP);
+
+        // Thread para aceitar conexões TCP
+        Thread tcpListener = new Thread(() -> {
+            while (true) {
+                try (Socket clientSocket = TCPsocket.accept()) {
+                    handleTCPClient(clientSocket);
+                } catch (IOException e) {
+                    System.out.println("[ERROR] TCP Server error: " + e.getMessage());
+                }
+            }
+        });
+        tcpListener.start();
 
         // Enquanto o servidor estiver rodando, fica aguardando pacotes de agentes
         while (true) {
