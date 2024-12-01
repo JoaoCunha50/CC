@@ -1,37 +1,42 @@
 package PDU;
 
 import java.io.*;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.nio.ByteBuffer;
 
-
+import java.util.UUID;
 
 public class AlertFlow implements Serializable {
-    public String UUID;
-    public byte[] data;
 
-    public AlertFlow(String uUID, byte[] data) {
-        UUID = uUID;
-        this.data = data;
-    }
+    public static final int ALERT = 5;
 
-    public String getUUID() {
-        return UUID;
-    }
+    public byte[] createAlertFlowPDU(int seq, int taskType, double outputValue, int treshhold) {
 
-    public void setUUID(String uUID) {
-        UUID = uUID;
-    }
+        String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
+        int type = ALERT;
 
-    public byte[] getData() {
-        return data;
-    }
+        if (taskType == 5) {
+            outputValue *= 10;
+        }
 
-    public void setData(byte[] data) {
-        this.data = data;
+        byte type_byte = (byte) type;
+        byte[] uuidBytes = uuid.getBytes();
+        byte output_byte = (byte) outputValue;
+        byte taskType_byte = (byte) taskType;
+        byte treshhold_byte = (byte) treshhold;
+        byte[] seq_bytes = ByteBuffer.allocate(4).putInt(seq).array(); // Alocar 4 bytes para seq (inteiro completo)
+
+        // Criar um ByteBuffer para conter o tipo e o UUID
+        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 1 + 3 + 1 + 1 + 1);
+
+        buffer.put(uuidBytes); // Coloca os bytes do UUID no buffer
+        buffer.put(type_byte); // Coloca o tipo (int) no buffer
+        buffer.put(seq_bytes, 1, 3);
+        buffer.put(taskType_byte); // coloca o task type (int) no buffer
+        buffer.put(treshhold_byte);
+        buffer.put(output_byte); // colocar o output no buffer
+
+        byte[] alertPDU = buffer.array(); // Obter o array de bytes
+
+        return alertPDU;
     }
 }

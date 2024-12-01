@@ -10,11 +10,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 import utils.*;
+import PDU.AlertFlow;
 import PDU.NetTask;
 
 public class nmsAgent {
     private DatagramSocket socket;
     private Socket TCPSocket;
+    private OutputStream outputTCP;
+    private InputStream inputTCP;
     private InetAddress serverAddress;
     private int serverPort;
     private ExecutorService agentExecutor;
@@ -25,15 +28,29 @@ public class nmsAgent {
         this.serverAddress = InetAddress.getByName(servidorIP);
         this.serverPort = porta;
         this.socket = new DatagramSocket(); // Usa uma porta dinâmica para envio
-        this.TCPSocket = new Socket();
+
+        this.TCPSocket = new Socket(serverAddress, 1234);
+        this.outputTCP = TCPSocket.getOutputStream();
+        this.inputTCP = TCPSocket.getInputStream();
+        System.out.println("[AGENT] TCP socket connected to server at " + servidorIP + ":" + porta);
+        
         this.agentExecutor = Executors.newFixedThreadPool(2);
         this.seqnum_atual = 1;
         this.lock = new ReentrantLock();
     }
 
     public void sendByteArray(byte[] data) throws IOException {
-        DatagramPacket packet = new DatagramPacket(data, data.length, serverAddress, serverPort);
-        socket.send(packet);
+        if (Byte.toUnsignedInt(data[36]) == AlertFlow.ALERT) {
+            try {
+                outputTCP.write(data);
+                outputTCP.flush();
+            } catch (IOException e) {
+                System.out.println("[ERROR] Failed to send data via TCP: " + e.getMessage());
+            }
+        } else {
+            DatagramPacket packet = new DatagramPacket(data, data.length, serverAddress, serverPort);
+            socket.send(packet);
+        }
     }
 
     public byte[] receiveByteArray() throws IOException {
@@ -167,13 +184,14 @@ public class nmsAgent {
                         Runnable task = () -> {
                             try {
                                 NetTask handlerPDU = new NetTask();
+                                AlertFlow handlerAlerts = new AlertFlow();
                                 double taskOutput = -1;
 
                                 // Executa a tarefa
                                 taskOutput = executeTasks(taskType, freq, iperfMode, destIP);
 
                                 if (taskOutput > threshold && taskOutput != 404) {
-                                    System.out.println("[ALERTFLOW] Metric is above threshold");
+                                    sendAlert(handlerAlerts, taskOutput, taskType, threshold, seqnum_atual);
                                 } else {
                                     sendMetrics(handlerPDU, taskOutput, taskType);
                                 }
@@ -186,13 +204,14 @@ public class nmsAgent {
                         scheduler.scheduleAtFixedRate(task, 0, freq, TimeUnit.SECONDS);
                     } else {
                         NetTask handlerPDU = new NetTask();
+                        AlertFlow handlerAlerts = new AlertFlow();
                         double taskOutput = -1;
 
                         // Executa a tarefa
                         taskOutput = executeTasks(taskType, freq, iperfMode, destIP);
 
                         if (taskOutput > threshold && taskOutput != 404) {
-                            System.out.println("[ALERTFLOW] Metric is above threshold");
+                            sendAlert(handlerAlerts, taskOutput, taskType, threshold, seqnum_atual);
                         } else {
                             sendMetrics(handlerPDU, taskOutput, taskType);
                         }
@@ -214,7 +233,7 @@ public class nmsAgent {
 
     public void sendMetrics(NetTask handlerPDU, double taskOutput, int taskType) {
         try {
-            if (taskOutput == 404){
+            if (taskOutput == 404) {
                 return;
             }
             byte[] metricsPDU = handlerPDU.createOutput(taskOutput, taskType);
@@ -226,6 +245,7 @@ public class nmsAgent {
             System.out.println("[METRICS SENT] Task Output sent.");
             System.out.println("     taskUUID: " + metricsUUID);
             System.out.println("     metrics:  " + taskOutput);
+            System.out.println("     task_type:  " + taskType);
             System.out.println();
             sendByteArray(metricsPDU);
 
@@ -241,6 +261,60 @@ public class nmsAgent {
                             ackReceived = true;
                             System.out.println("[ACK RECEIVED] Acknowledgment received successfully.");
                         } else if (!waitForAck(typeInt, ackInt, metricsPDU)) {
+                            System.out.println("[ACK FAILED] Received invalid ACK. Retrying...");
+                        }
+                    } else {
+                        System.out.println("[ACK TIMEOUT] No acknowledgment received. Retrying...");
+                        Thread.sleep(100);
+                    }
+                } catch (IOException | InterruptedException e) {
+                    System.out.println("[ERROR] Failed to receive acknowledgment: " + e.getMessage());
+                }
+            }
+
+            if (!ackReceived) {
+                System.out.println("[ERROR] Failed to receive acknowledgment after " + maxRetries + " retries.");
+            }
+        } catch (IOException e) {
+            System.out.println("[ERROR] Task execution was interrupted: " + e.getMessage());
+            Thread.currentThread().interrupt(); // Restaure o estado de interrupção da thread
+        }
+    }
+
+    public void sendAlert(AlertFlow handlerPDU, double taskOutput, int taskType, int treshhold, int seq) {
+        try {
+            if (taskOutput == 404) {
+                return;
+            }
+            byte[] alertPDU = handlerPDU.createAlertFlowPDU(seq, taskType, taskOutput, treshhold);
+            byte[] alertUUIDBytes = Arrays.copyOfRange(alertPDU, 0, 36);
+            String alertUUID = new String(alertUUIDBytes, StandardCharsets.UTF_8);
+            boolean ackReceived = false;
+            int maxRetries = 3; // Número máximo de tentativas
+
+            sendByteArray(alertPDU);
+            System.out.println("[ALERTFLOW SENT] Alert sent to server.");
+            System.out.println("     taskUUID: " + alertUUID);
+            System.out.println("     metrics:  " + taskOutput);
+            System.out.println("     treshhold:  " + treshhold);
+            System.out.println("     task_type:  " + taskType);
+            System.out.println();
+
+            while (!ackReceived) {
+                try {
+                    byte[] ackBuffer = new byte[1024];
+                    int bytesRead = inputTCP.read(ackBuffer);
+
+                    if (bytesRead > 0) {
+                        byte[] ackPDU = Arrays.copyOfRange(ackBuffer, 0, bytesRead);
+                        int typeInt = Byte.toUnsignedInt(ackPDU[36]);
+                        byte[] ackBytes = Arrays.copyOfRange(ackPDU, 37, 40);
+                        int ackInt = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
+
+                        if (waitForAck(typeInt, ackInt, alertPDU)) {
+                            ackReceived = true;
+                            System.out.println("[ACK RECEIVED] Acknowledgment received successfully.");
+                        } else if (!waitForAck(typeInt, ackInt, alertPDU)) {
                             System.out.println("[ACK FAILED] Received invalid ACK. Retrying...");
                         }
                     } else {
