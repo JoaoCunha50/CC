@@ -63,6 +63,8 @@ public class NetTask implements Serializable {
                 return createBandwidthTask(freq, threshold, destination, mode);
             case 4: // Interface Task
                 return createJitterTask(freq, threshold, destination, mode);
+            case 5:
+                return createPacketLossTask(freq, threshold, destination, mode);
             default:
                 // Return null or some default value if taskType doesn't match any case
                 throw new IllegalArgumentException("Invalid task type: " + taskType);
@@ -205,19 +207,25 @@ public class NetTask implements Serializable {
         return interfaceTaskPDU;
     }
 
-    public byte[] createOutput(double outputValue) {
+    public byte[] createOutput(double outputValue, int taskType) {
         String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
         int type = METRICS;
+
+        if (taskType == 5) {
+            outputValue *= 10;
+        }
 
         byte type_byte = (byte) type;
         byte[] uuidBytes = uuid.getBytes();
         byte output_byte = (byte) outputValue;
+        byte taskType_byte = (byte) taskType;
 
         // Criar um ByteBuffer para conter o tipo e o UUID
-        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 2);
+        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 3);
 
         buffer.put(uuidBytes); // Coloca os bytes do UUID no buffer
         buffer.put(type_byte); // Coloca o tipo (int) no buffer
+        buffer.put(taskType_byte); // coloca o task type (int) no buffer
         buffer.put(output_byte); // colocar o output no buffer
 
         byte[] ackPDU = buffer.array(); // Obter o array de bytes
@@ -284,6 +292,57 @@ public class NetTask implements Serializable {
         String uuid = UUID.randomUUID().toString();
         int type = TASK;
         int taskType = 4; // definido anteriormente
+
+        byte[] uuidBytes = uuid.getBytes();
+        byte type_byte = (byte) type;
+        byte taskType_byte = (byte) taskType;
+        byte freq_byte = (byte) freq;
+        byte threshold_byte = (byte) threshold;
+
+        // Determinar o tamanho do buffer
+        int bufferSize = uuidBytes.length + 8; // Tamanho do UUID + 8 bytes para os outros campos (tipo, taskType, freq,
+                                               // threshold)
+
+        // Adicionar o tamanho extra dependendo do "mode"
+        if ("server".equals(mode)) {
+            bufferSize += 1; // Adiciona 1 byte para o 'server' mode
+        } else if ("client".equals(mode)) {
+            bufferSize += 5; // Adiciona 4 bytes para o endereço IP e 1 byte para o 'client' mode
+        }
+
+        ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+
+        // Colocar o UUID, tipo, taskType, freq, e threshold no buffer
+        buffer.put(uuidBytes);
+        buffer.put(type_byte);
+        // vai ser inserido um seq num aqui
+        buffer.put(taskType_byte);
+        buffer.put(freq_byte);
+        buffer.put(threshold_byte);
+
+        // Se for "server", adicionar 1 byte indicando "server"
+        if ("server".equals(mode)) {
+            byte server_byte = (byte) 1; // 1 para server
+            buffer.put(server_byte);
+        }
+        // Se for "client", adicionar 4 bytes para o endereço IP de destino e 1 byte
+        else if ("client".equals(mode)) {
+            byte server_byte = (byte) 0; // 0 para client
+            buffer.put(server_byte);
+
+            // Coloca os 4 bytes do endereço IP de destino no buffer
+            byte[] destinationIP_bytes = destination.getAddress(); // 4 bytes
+            buffer.put(destinationIP_bytes);
+
+        }
+
+        return buffer.array();
+    }
+
+    public byte[] createPacketLossTask(int freq, int threshold, InetAddress destination, String mode) {
+        String uuid = UUID.randomUUID().toString();
+        int type = TASK;
+        int taskType = 5; // definido anteriormente
 
         byte[] uuidBytes = uuid.getBytes();
         byte type_byte = (byte) type;

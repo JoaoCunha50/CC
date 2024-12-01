@@ -164,7 +164,6 @@ public class nmsServer {
                         // Verificar se o pacote é um ACK válido
                         if (typeInt == NetTask.ACKNOWLEDGE && ackValue == currentSeq + completeTask.length) {
                             seqNumbers.addToExistingValue(agentID, ackValue);
-                            System.out.println(seqNumbers.getSeqNumber(agentID)); // Atualizar número de sequência
                             ackReceived = true;
                             System.out.println("[ACK RECEIVED] ACK received from agent " + agentID);
                         }
@@ -203,23 +202,24 @@ public class nmsServer {
     }
     
     
-
+    
     private void processMetrics(DatagramPacket packet) {
         try {
             NetTask handler = new NetTask();
             byte[] dataEntry = packet.getData();
             InetSocketAddress clientAddress = new InetSocketAddress(packet.getAddress(), packet.getPort());
-
-            byte[] bufferTemp = Arrays.copyOfRange(dataEntry, 0, 38);
+            
+            byte[] bufferTemp = Arrays.copyOfRange(dataEntry, 0, 39);
             String pduUUID = new String(Arrays.copyOfRange(bufferTemp, 0, 36), StandardCharsets.UTF_8);
             int type = Byte.toUnsignedInt(bufferTemp[36]);
-            double output = Byte.toUnsignedInt(bufferTemp[37]);
+            int taskType = Byte.toUnsignedInt(bufferTemp[37]);
+            double output = Byte.toUnsignedInt(bufferTemp[38]);
 
-            Integer agentID = agentRegistry.entrySet().stream()
-                    .filter(entry -> entry.getValue().equals(clientAddress))
-                    .map(Map.Entry::getKey)
-                    .findFirst()
-                    .orElse(null);
+            if (taskType == 5) { // para converter este output no seu valor real
+                output /= 10;
+            }
+            
+            int agentID = getIDfromIP(clientAddress);
 
             if (type == NetTask.METRICS) {
                 int seq_updated = seqNumbers.getNextSeqNum(bufferTemp, seqNumbers.getSeqNumber(agentID));
@@ -236,7 +236,8 @@ public class nmsServer {
                 System.out.println("     metrics:  " + output);
                 System.out.println();
 
-                System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
+                String agentID_String = "agent" + agentID;
+                saveMetricsToJson(agentID_String, pduUUID, output, taskType);
             }
         } catch (IOException e) {
             System.out.println("Error processing metrics: " + e.getMessage());
@@ -244,7 +245,7 @@ public class nmsServer {
     }
 
     @SuppressWarnings("unchecked")
-    public void saveMetricsToJson(String agentName, String taskUUID, double metrics) {
+    public void saveMetricsToJson(String agentName, String taskUUID, double metrics, int taskType) {
         try {
             String metricsDir = "metrics";
             String filePath = metricsDir + "/metrics.json";
@@ -275,10 +276,12 @@ public class nmsServer {
                 taskList = new JSONArray(); // Se não existir, cria uma nova lista
             }
 
-            // Cria um objeto JSON para a nova task
+            // Cria um objeto JSON para a nova task, incluindo taskType, taskUUID e metrics
+            // na ordem correta
             JSONObject task = new JSONObject();
-            task.put("taskUUID", taskUUID);
-            task.put("metrics", metrics);
+            task.put("taskType", taskType); // Adiciona o taskType
+            task.put("metrics", metrics); // Adiciona as métricas
+            task.put("taskUUID", taskUUID); // Adiciona o taskUUID
 
             // Adiciona a nova task na lista do agente
             taskList.add(task);
@@ -307,6 +310,8 @@ public class nmsServer {
 
     public void start() {
         System.out.println("Server started, waiting for packets...");
+        System.out.println("UDP Port: " + PortaUDP);
+        System.out.println("TCP Port: " + PortaTCP);
 
         // Enquanto o servidor estiver rodando, fica aguardando pacotes de agentes
         while (true) {
