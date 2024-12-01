@@ -96,6 +96,7 @@ public class nmsAgent {
                             break;
                         case 3:
                         case 4:
+                        case 5:
                             byte[] nextThreeBytes = Arrays.copyOfRange(defaultBuffer, 39, 42);
                             byte iperfMode = nextThreeBytes[2];
                             if (iperfMode == 1) {
@@ -116,7 +117,7 @@ public class nmsAgent {
                     int freq = Byte.toUnsignedInt(bufferPayload[0]);
                     int threshold = Byte.toUnsignedInt(bufferPayload[1]);
                     final int iperfMode;
-                    if (taskType == 3 || taskType == 4) {
+                    if (taskType == 3 || taskType == 4 || taskType == 5) {
                         iperfMode = Byte.toUnsignedInt(bufferPayload[2]);
                     } else
                         iperfMode = -1;
@@ -128,7 +129,7 @@ public class nmsAgent {
                     }
 
                     final String destIP;
-                    if ((taskType == 3 || taskType == 4) && ipBytes != null) {
+                    if ((taskType == 3 || taskType == 4 || taskType == 5) && ipBytes != null) {
                         InetAddress inetAddress = InetAddress.getByAddress(ipBytes);
                         destIP = inetAddress.getHostAddress();
                     } else {
@@ -165,7 +166,7 @@ public class nmsAgent {
                                 if (taskOutput > threshold) {
                                     System.out.println("[ALERTFLOW] Metric is above threshold");
                                 } else {
-                                    sendMetrics(handlerPDU, taskOutput);
+                                    sendMetrics(handlerPDU, taskOutput, taskType);
                                 }
                             } catch (InterruptedException e) {
                                 System.err.println("[ERROR] Task execution was interrupted: " + e.getMessage());
@@ -184,7 +185,7 @@ public class nmsAgent {
                         if (taskOutput > threshold && taskOutput != 404) {
                             System.out.println("[ALERTFLOW] Metric is above threshold");
                         } else {
-                            sendMetrics(handlerPDU, taskOutput);
+                            sendMetrics(handlerPDU, taskOutput, taskType);
                         }
                     }
 
@@ -202,12 +203,12 @@ public class nmsAgent {
         return execute.handleTasks(taskType, frequency, ip, iperfMode);
     }
 
-    public void sendMetrics(NetTask handlerPDU, double taskOutput) {
+    public void sendMetrics(NetTask handlerPDU, double taskOutput, int taskType) {
         lock.lock();
         try {
             if (taskOutput == 404)
                 return;
-            byte[] metricsPDU = handlerPDU.createOutput(taskOutput);
+            byte[] metricsPDU = handlerPDU.createOutput(taskOutput, taskType);
             byte[] metricsUUIDBytes = Arrays.copyOfRange(metricsPDU, 0, 36);
             String metricsUUID = new String(metricsUUIDBytes, StandardCharsets.UTF_8);
             sendByteArray(metricsPDU);

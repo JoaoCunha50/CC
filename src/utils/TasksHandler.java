@@ -32,6 +32,12 @@ public class TasksHandler {
                 } else if (mode == 0) {
                     return getIperfJitter(ip);
                 }
+            case 5:
+                if (mode == 1) {
+                    createIperfServer();
+                } else if (mode == 0) {
+                    return getIperfPacketLoss(ip);
+                }
             default:
                 return output;
         }
@@ -149,7 +155,6 @@ public class TasksHandler {
             // Inicia o processo em segundo plano
             Process process = builder.start();
 
-            System.out.println("Servidor IPERF iniciado em segundo plano!");
 
             // Não aguarda o processo para não bloquear a execução
             // process.waitFor(); // Remover esta linha
@@ -246,6 +251,105 @@ public class TasksHandler {
 
         // Retorna 0.0 se nenhum jitter for encontrado
         return 0.0;
+    }
+
+    private static double getIperfPacketLoss(String serverIp) {
+        try {
+            // Comando para executar o iperf3
+            String command = "iperf3 -c " + serverIp + " -u -t 10";
+
+            // Criação do processo
+            ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));
+            Process process = processBuilder.start();
+
+            // Aguarda o término do processo
+            process.waitFor();
+
+            // Lê a saída completa do comando
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            String lastRelevantLine = null; // Para armazenar a última linha relevante
+
+            // Itera pela saída linha por linha e guarda a última linha relevante
+            while ((line = reader.readLine()) != null) {
+                if (line.contains("%")) { // Busca linhas que contenham "ms"
+                    lastRelevantLine = line; // Atualiza para a última linha encontrada
+                }
+            }
+
+            if (lastRelevantLine != null) {
+                // Divide a linha para capturar o valor antes de "%"
+                String[] parts = lastRelevantLine.trim().split("\\s+"); // Divide por espaços
+                for (int i = 0; i < parts.length; i++) {
+                    if (parts[i].contains("%")) { // Encontra o item que contém "%"
+                        String percentageValue = parts[i]
+                                .replace("%", "") // Remove o símbolo "%"
+                                .replace("(", "") // Remove o parêntese de abertura
+                                .replace(")", "") // Remove o parêntese de fechamento
+                                .trim(); // Remove espaços extras
+                        try {
+                            double packetLoss = Double.parseDouble(percentageValue); // Converte para double
+                            return packetLoss; // Retorna o valor de packet loss
+                        } catch (NumberFormatException e) {
+                            System.out.println("Erro ao converter o valor para número: " + percentageValue);
+                            e.printStackTrace(); // Para depuração
+                        }
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        // Retorna 0.0 se nenhum jitter for encontrado
+        return 2.0;
+    }
+
+    private static double getPacketLoss(String serverIp) {
+        try {
+            // Comando para executar o iperf3
+            String command = "iperf3 -c " + serverIp + " -u -t 10";
+
+            // Criação do processo
+            ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));
+            Process process = processBuilder.start();
+
+            // Aguarda o término do processo
+            process.waitFor();
+
+            // Lê a saída completa do comando
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            String lastLine = null;
+
+            // Itera pela saída linha por linha
+            while ((line = reader.readLine()) != null) {
+                lastLine = line; // Guarda a última linha lida
+            }
+
+            // Verifica se encontramos uma linha e se ela contém parênteses
+            if (lastLine != null) {
+                System.out.println("é esta linha " + line);
+                // Procura pelo valor entre parênteses
+                int startIndex = lastLine.indexOf('('); // Índice do primeiro parêntese
+                int endIndex = lastLine.indexOf(')'); // Índice do segundo parêntese
+
+                if (startIndex != -1 && endIndex != -1) {
+                    // Extrai o valor entre parênteses
+                    String packetLossValue = lastLine.substring(startIndex + 1, endIndex).replace("%", "").trim();
+                    return Double.parseDouble(packetLossValue); // Converte para double e retorna
+                } else {
+                    System.out.println("Não encontrou parênteses na última linha.");
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        // Retorna 0.0 se nenhum valor for encontrado
+        return 2.0;
     }
 
 }

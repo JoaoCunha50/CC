@@ -192,13 +192,17 @@ public class nmsServer {
     private void processMetrics(DatagramPacket packet) {
         try {
             byte[] dataEntry = packet.getData();
-            byte[] data = Arrays.copyOfRange(dataEntry, 0, 38);
             InetSocketAddress clientAddress = new InetSocketAddress(packet.getAddress(), packet.getPort());
 
-            byte[] bufferTemp = Arrays.copyOfRange(dataEntry, 0, 38);
+            byte[] bufferTemp = Arrays.copyOfRange(dataEntry, 0, 39);
             String pduUUID = new String(Arrays.copyOfRange(bufferTemp, 0, 36), StandardCharsets.UTF_8);
             int type = Byte.toUnsignedInt(bufferTemp[36]);
-            double output = Byte.toUnsignedInt(bufferTemp[37]);
+            int taskType = Byte.toUnsignedInt(bufferTemp[37]);
+            double output = Byte.toUnsignedInt(bufferTemp[38]);
+
+            if (taskType == 5) { // para converter este output no seu valor real
+                output /= 10;
+            }
 
             if (type == NetTask.METRICS) {
                 System.out.println("[METRICS RECEIVED] Task Output received:");
@@ -208,7 +212,7 @@ public class nmsServer {
 
                 int ID = getIDfromIP(clientAddress);
                 String agentID = "agent" + ID;
-                saveMetricsToJson(agentID, pduUUID, output);
+                saveMetricsToJson(agentID, pduUUID, output, taskType);
 
                 NetTask handler = new NetTask();
                 byte[] ackPDU = handler.createAckPDU(10);
@@ -221,7 +225,7 @@ public class nmsServer {
     }
 
     @SuppressWarnings("unchecked")
-    public void saveMetricsToJson(String agentName, String taskUUID, double metrics) {
+    public void saveMetricsToJson(String agentName, String taskUUID, double metrics, int taskType) {
         try {
             String metricsDir = "metrics";
             String filePath = metricsDir + "/metrics.json";
@@ -252,10 +256,12 @@ public class nmsServer {
                 taskList = new JSONArray(); // Se não existir, cria uma nova lista
             }
 
-            // Cria um objeto JSON para a nova task
+            // Cria um objeto JSON para a nova task, incluindo taskType, taskUUID e metrics
+            // na ordem correta
             JSONObject task = new JSONObject();
-            task.put("taskUUID", taskUUID);
-            task.put("metrics", metrics);
+            task.put("taskType", taskType); // Adiciona o taskType
+            task.put("metrics", metrics); // Adiciona as métricas
+            task.put("taskUUID", taskUUID); // Adiciona o taskUUID
 
             // Adiciona a nova task na lista do agente
             taskList.add(task);
@@ -293,7 +299,7 @@ public class nmsServer {
 
                 // Verifica o tipo do pacote (tarefa ou métrica)
                 byte[] data = Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
-                int type = Byte.toUnsignedInt(data[data.length - 2]); // Assume que o tipo está nos 2 últimos bytes
+                int type = Byte.toUnsignedInt(data[data.length - 3]); // Assume que o tipo está nos 3 últimos bytes
 
                 // Se for uma métrica, processa
                 if (type == NetTask.METRICS) {
