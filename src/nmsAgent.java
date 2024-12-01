@@ -87,7 +87,7 @@ public class nmsAgent {
 
                 if (defaultBuffer.length > 0 && type == NetTask.TASK) {
                     byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 41); // o bufferTemp[36] é o type da
-                                                                                  // mensagem!
+                    // mensagem!
                     int taskType = Byte.toUnsignedInt(bufferTemp[40]);
                     byte[] ackBytes = Arrays.copyOfRange(bufferTemp, bufferTemp.length - 4, bufferTemp.length);
                     int seqNum = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
@@ -106,7 +106,9 @@ public class nmsAgent {
                         case 3:
                         case 4:
                         case 5:
-                            byte[] nextThreeBytes = Arrays.copyOfRange(defaultBuffer, 39, 42);
+                            byte[] nextThreeBytes = Arrays.copyOfRange(defaultBuffer, 41, 44); // tive de aumentar pois
+                                                                                               // demos mais bytes ao
+                                                                                               // seq
                             byte iperfMode = nextThreeBytes[2];
                             if (iperfMode == 1) {
                                 payloadLength = 3;
@@ -214,7 +216,7 @@ public class nmsAgent {
 
     public void sendMetrics(NetTask handlerPDU, double taskOutput, int taskType) {
         try {
-            if (taskOutput == 404){
+            if (taskOutput == 404) {
                 return;
             }
             byte[] metricsPDU = handlerPDU.createOutput(taskOutput, taskType);
