@@ -18,22 +18,20 @@ public class NetTask implements Serializable {
     public byte[] createRegisterPDU(int seq) {
         String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
         int type = REGISTER;
-
+    
         byte type_byte = (byte) type;
         byte[] uuidBytes = uuid.getBytes();
-        byte seq_byte = (byte) seq;
-
-        // Criar um ByteBuffer para conter o tipo e o UUID
-        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 2); // 4 bytes para o int e o restante para o
-        // UUID
+        byte[] seq_bytes = ByteBuffer.allocate(4).putInt(seq).array(); // Alocar 4 bytes para seq (inteiro completo)
+    
+        // Criar um ByteBuffer com o tamanho correto
+        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 1 + 3); // Tipo (1 byte) + UUID + seq (3 bytes)
         buffer.put(uuidBytes); // Coloca os bytes do UUID no buffer
-        buffer.put(type_byte); // Coloca o tipo (int) no buffer
-        buffer.put(seq_byte);
-
-        byte[] registerPDU = buffer.array(); // Obter o array de bytes
-
-        return registerPDU;
+        buffer.put(type_byte); // Coloca o tipo no buffer
+        buffer.put(seq_bytes, 1, 3); // Pega os últimos 3 bytes de seq e os coloca no buffer
+    
+        return buffer.array();
     }
+    
 
     public byte[] createAckPDU(int ackValue) {
         String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
@@ -41,18 +39,15 @@ public class NetTask implements Serializable {
 
         byte type_byte = (byte) type;
         byte[] uuidBytes = uuid.getBytes();
-        byte ack_valueByte = (byte) ackValue;
+        byte[] ack_bytes = ByteBuffer.allocate(4).putInt(ackValue).array(); // Alocar 3 bytes para ackValue
 
-        // Criar um ByteBuffer para conter o tipo e o UUID
-        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 2); // 4 bytes para o int e o restante para o
-                                                                       // UUID
+        // Criar um ByteBuffer para conter o tipo, UUID e ackValue
+        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 1 + 3); // Tipo (1 byte) + UUID + ackValue (3 bytes)
         buffer.put(uuidBytes); // Coloca os bytes do UUID no buffer
-        buffer.put(type_byte); // Coloca o tipo (int) no buffer
-        buffer.put(ack_valueByte);
+        buffer.put(type_byte); // Coloca o tipo no buffer
+        buffer.put(ack_bytes, 1, 3); // Pega os últimos 3 bytes de ackValue e os coloca no buffer
 
-        byte[] ackPDU = buffer.array(); // Obter o array de bytes
-
-        return ackPDU;
+        return buffer.array();
     }
 
     public byte[] createTaskPDU(int taskType, int freq, int threshold, InetAddress source, InetAddress destination,
