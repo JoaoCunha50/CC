@@ -13,11 +13,10 @@
         "agent_id": 2,
         "tasks": [
             {
-                "task_type": 5,
-                "frequency": 10,
-                "alertflow_condition": 100,
-                "mode": "client",
-                "destination_ip": "10.0.5.10"
+                "task_type": 6,
+                "frequency": 1,
+                "alertflow_condition": 1,
+                "interfaceName": "eth0"
             }
         ]
     },

@@ -3,6 +3,7 @@ package utils;
 import com.sun.management.OperatingSystemMXBean;
 
 import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
@@ -11,7 +12,8 @@ import java.util.regex.Pattern;
 
 public class TasksHandler {
 
-    public double handleTasks(int task, int frequency, String ip, int mode) throws InterruptedException {
+    public double handleTasks(int task, int frequency, String ip, int mode, String interfaceName)
+            throws InterruptedException {
         double output = 404;
         switch (task) {
             case 0:
@@ -38,6 +40,8 @@ public class TasksHandler {
                 } else if (mode == 0) {
                     return getIperfPacketLoss(ip);
                 }
+            case 6:
+                return getInterfacePackets(interfaceName);
             default:
                 return output;
         }
@@ -326,6 +330,40 @@ public class TasksHandler {
                 e.printStackTrace();
             }
         }
+    }
+
+    public static double getInterfacePackets(String interfaceName) { // este valor ainda não está a 100% !!!!!!!
+        long initialPackets = 0;
+        long finalPackets = 0;
+
+        try {
+            // Caminho para o contador de pacotes transmitidos
+            String txPath = "/sys/class/net/" + interfaceName + "/statistics/tx_packets";
+
+            // Ler o valor inicial
+            initialPackets = readTxPackets(txPath);
+
+            // Aguardar 1 segundo
+            Thread.sleep(1000);
+
+            // Ler o valor final
+            finalPackets = readTxPackets(txPath);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return -1.0; // Retornar -1.0 em caso de erro
+        }
+
+        // Calcular a diferença e retornar como pacotes por segundo
+        return finalPackets - initialPackets;
+    }
+
+    // Método auxiliar para ler o valor de pacotes transmitidos
+    private static long readTxPackets(String filePath) throws IOException {
+        BufferedReader reader = new BufferedReader(new FileReader(filePath));
+        String line = reader.readLine();
+        reader.close();
+        return Long.parseLong(line.trim());
     }
 
 }

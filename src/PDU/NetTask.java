@@ -18,20 +18,19 @@ public class NetTask implements Serializable {
     public byte[] createRegisterPDU(int seq) {
         String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
         int type = REGISTER;
-    
+
         byte type_byte = (byte) type;
         byte[] uuidBytes = uuid.getBytes();
         byte[] seq_bytes = ByteBuffer.allocate(4).putInt(seq).array(); // Alocar 4 bytes para seq (inteiro completo)
-    
+
         // Criar um ByteBuffer com o tamanho correto
         ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 1 + 3); // Tipo (1 byte) + UUID + seq (3 bytes)
         buffer.put(uuidBytes); // Coloca os bytes do UUID no buffer
         buffer.put(type_byte); // Coloca o tipo no buffer
         buffer.put(seq_bytes, 1, 3); // Pega os últimos 3 bytes de seq e os coloca no buffer
-    
+
         return buffer.array();
     }
-    
 
     public byte[] createAckPDU(int ackValue) {
         String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
@@ -65,6 +64,8 @@ public class NetTask implements Serializable {
                 return createJitterTask(freq, threshold, destination, mode);
             case 5:
                 return createPacketLossTask(freq, threshold, destination, mode);
+            case 6:
+                return createInterfaceTask(freq, threshold, interfaceName);
             default:
                 // Return null or some default value if taskType doesn't match any case
                 throw new IllegalArgumentException("Invalid task type: " + taskType);
@@ -184,7 +185,7 @@ public class NetTask implements Serializable {
     public byte[] createInterfaceTask(int freq, int threshold, String interfaceName) {
         String uuid = UUID.randomUUID().toString();
         int type = TASK;
-        int taskType = 4; // definido anteriormente
+        int taskType = 6; // definido anteriormente
 
         byte[] uuidBytes = uuid.getBytes();
         byte type_byte = (byte) type;
@@ -270,7 +271,6 @@ public class NetTask implements Serializable {
             byte server_byte = (byte) 1; // 1 para server
             buffer.put(server_byte);
             System.out.println();
-            System.out.println("criei uma do servidor");
         }
         // Se for "client", adicionar 4 bytes para o endereço IP de destino e 1 byte
         else if ("client".equals(mode)) {
@@ -282,7 +282,6 @@ public class NetTask implements Serializable {
             buffer.put(destinationIP_bytes);
 
             System.out.println();
-            System.out.println("criei uma do cliente");
         }
 
         return buffer.array();
@@ -376,7 +375,6 @@ public class NetTask implements Serializable {
             byte server_byte = (byte) 1; // 1 para server
             buffer.put(server_byte);
             System.out.println();
-            System.out.println("criei uma do servidor");
         }
         // Se for "client", adicionar 4 bytes para o endereço IP de destino e 1 byte
         else if ("client".equals(mode)) {
@@ -388,7 +386,6 @@ public class NetTask implements Serializable {
             buffer.put(destinationIP_bytes);
 
             System.out.println();
-            System.out.println("criei uma do cliente");
         }
 
         return buffer.array();

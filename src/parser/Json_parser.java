@@ -56,9 +56,14 @@ public class Json_parser {
 
                             String mode = null;
                             InetAddress destIpAddress = null;
+                            String interfaceName = null;
 
                             if (taskJson.containsKey("mode")) {
                                 mode = (String) taskJson.get("mode");
+                            }
+
+                            if (taskJson.containsKey("interfaceName")) {
+                                interfaceName = (String) taskJson.get("interfaceName");
                             }
 
                             if ("client".equals(mode) && taskJson.containsKey("destination_ip")) {
@@ -78,7 +83,10 @@ public class Json_parser {
                             System.out.println("frequency: " + frequency);
                             System.out.println("alertflow_condition: " + alertflow_condition);
                             System.out.println("mode: " + mode);
-                            System.out.println("destination_ip: " + (destIpAddress != null ? destIpAddress : "Nenhum IP definido"));
+                            System.out.println("destination_ip: "
+                                    + (destIpAddress != null ? destIpAddress : "Nenhum IP definido"));
+                            System.out.println("interfaceName: "
+                                    + (interfaceName != null ? interfaceName : "Nenhuma interface definida"));
                             System.out.println("===============================");
                             System.out.println();
 
@@ -90,13 +98,14 @@ public class Json_parser {
                                     alertflow_condition,
                                     InetAddress.getByName("192.168.1.1"),
                                     destIpAddress,
-                                    "",
+                                    interfaceName, // Passar o interfaceName para o NetTask
                                     mode);
 
                             // Adicionar tarefa à lista do agente
                             agentTasks.add(taskPDU);
                         } catch (ClassCastException | NullPointerException e) {
-                            System.err.println("Erro ao processar tarefa para agent_id " + agent_id + ": " + e.getMessage());
+                            System.err.println(
+                                    "Erro ao processar tarefa para agent_id " + agent_id + ": " + e.getMessage());
                         }
                     }
 
@@ -118,4 +127,5 @@ public class Json_parser {
 
         return tasksMap;
     }
+
 }
