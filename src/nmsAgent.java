@@ -1,6 +1,7 @@
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,7 +46,6 @@ public class nmsAgent {
     public boolean waitForAck(int type, int ackValue, byte[] pdu) {
         if (type == NetTask.ACKNOWLEDGE && ackValue == (seqnum_atual + pdu.length)) {
             seqnum_atual = ackValue;
-            System.out.println("[ACK RECEIVED] ACK received. Register successful.\n");
             return true;
         } else
             return false;
@@ -61,9 +61,15 @@ public class nmsAgent {
             // Receber resposta
             byte[] response = receiveByteArray();
             if (response != null && response.length > 0) {
-                int typeInt = Byte.toUnsignedInt(response[response.length - 2]);
-                int ackInt = Byte.toUnsignedInt(response[response.length - 1]);
-                waitForAck(typeInt, ackInt, registerPDU);
+                int typeInt = Byte.toUnsignedInt(response[response.length - 4]); // Ler o tipo (4º byte antes do final)
+
+                // Ler os 3 últimos bytes do seqNum (ACK)
+                byte[] ackBytes = Arrays.copyOfRange(response, response.length - 3, response.length);
+                int ackInt = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
+
+                if (waitForAck(typeInt, ackInt, registerPDU)) {
+                    System.out.println("[ACK RECEIVED] ACK received. Register successful.\n");
+                }
             }
         } catch (IOException e) {
             System.out.println("[REGISTER TIMEOUT] Register failed. Re-sending...\n" + e.getMessage());
@@ -73,15 +79,18 @@ public class nmsAgent {
     public void receiveTasks() {
         try {
             System.out.println("Waiting for tasks...");
+            System.out.println();
 
             while (true) {
                 byte[] defaultBuffer = receiveByteArray();
+                int type = Byte.toUnsignedInt(defaultBuffer[36]);
 
-                if (defaultBuffer.length > 0) {
-                    byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 39);
-                    // o bufferTemp[36] é o type da mensagem!
-                    int taskType = Byte.toUnsignedInt(bufferTemp[37]);
-                    int seqNum = Byte.toUnsignedInt(bufferTemp[38]);
+                if (defaultBuffer.length > 0 && type == NetTask.TASK) {
+                    byte[] bufferTemp = Arrays.copyOfRange(defaultBuffer, 0, 41); // o bufferTemp[36] é o type da
+                                                                                  // mensagem!
+                    int taskType = Byte.toUnsignedInt(bufferTemp[40]);
+                    byte[] ackBytes = Arrays.copyOfRange(bufferTemp, bufferTemp.length - 4, bufferTemp.length);
+                    int seqNum = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
 
                     int payloadLength = 0;
                     switch (taskType) {
@@ -111,7 +120,7 @@ public class nmsAgent {
                     }
                     ;
 
-                    byte[] bufferPayload = Arrays.copyOfRange(defaultBuffer, 39, 39 + payloadLength);
+                    byte[] bufferPayload = Arrays.copyOfRange(defaultBuffer, 41, 41 + payloadLength);
                     byte[] pduUUIDBytes = Arrays.copyOfRange(bufferTemp, 0, 36);
                     String pduUUID = new String(pduUUIDBytes, StandardCharsets.UTF_8);
                     int freq = Byte.toUnsignedInt(bufferPayload[0]);
@@ -163,7 +172,7 @@ public class nmsAgent {
                                 // Executa a tarefa
                                 taskOutput = executeTasks(taskType, freq, iperfMode, destIP);
 
-                                if (taskOutput > threshold) {
+                                if (taskOutput > threshold && taskOutput != 404) {
                                     System.out.println("[ALERTFLOW] Metric is above threshold");
                                 } else {
                                     sendMetrics(handlerPDU, taskOutput, taskType);
@@ -204,23 +213,51 @@ public class nmsAgent {
     }
 
     public void sendMetrics(NetTask handlerPDU, double taskOutput, int taskType) {
-        lock.lock();
         try {
-            if (taskOutput == 404)
+            if (taskOutput == 404){
                 return;
+            }
             byte[] metricsPDU = handlerPDU.createOutput(taskOutput, taskType);
             byte[] metricsUUIDBytes = Arrays.copyOfRange(metricsPDU, 0, 36);
             String metricsUUID = new String(metricsUUIDBytes, StandardCharsets.UTF_8);
-            sendByteArray(metricsPDU);
+            boolean ackReceived = false;
+            int maxRetries = 3; // Número máximo de tentativas
+
             System.out.println("[METRICS SENT] Task Output sent.");
             System.out.println("     taskUUID: " + metricsUUID);
             System.out.println("     metrics:  " + taskOutput);
             System.out.println();
+            sendByteArray(metricsPDU);
+
+            while (!ackReceived) {
+                try {
+                    byte[] ackPDU = receiveByteArray();
+                    if (ackPDU != null && ackPDU.length > 0) {
+                        int typeInt = Byte.toUnsignedInt(ackPDU[ackPDU.length - 4]);
+                        byte[] ackBytes = Arrays.copyOfRange(ackPDU, ackPDU.length - 3, ackPDU.length);
+                        int ackInt = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
+
+                        if (waitForAck(typeInt, ackInt, metricsPDU)) {
+                            ackReceived = true;
+                            System.out.println("[ACK RECEIVED] Acknowledgment received successfully.");
+                        } else if (!waitForAck(typeInt, ackInt, metricsPDU)) {
+                            System.out.println("[ACK FAILED] Received invalid ACK. Retrying...");
+                        }
+                    } else {
+                        System.out.println("[ACK TIMEOUT] No acknowledgment received. Retrying...");
+                        Thread.sleep(100);
+                    }
+                } catch (IOException | InterruptedException e) {
+                    System.out.println("[ERROR] Failed to receive acknowledgment: " + e.getMessage());
+                }
+            }
+
+            if (!ackReceived) {
+                System.out.println("[ERROR] Failed to receive acknowledgment after " + maxRetries + " retries.");
+            }
         } catch (IOException e) {
-            System.err.println("[ERROR] Task execution was interrupted: " + e.getMessage());
-            Thread.currentThread().interrupt(); // Restaura o estado de interrupção da thread
-        } finally {
-            lock.unlock();
+            System.out.println("[ERROR] Task execution was interrupted: " + e.getMessage());
+            Thread.currentThread().interrupt(); // Restaure o estado de interrupção da thread
         }
     }
 
