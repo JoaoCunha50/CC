@@ -1,133 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="./styles/styles.css" />
-    <link
-      rel="icon"
-      href="../assets/logon_1733092227-trimmy-logo(1).ico"
-      type="image/png"
-    />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap"
-      rel="stylesheet"
-    />
-    <title>CyberChase</title>
-    <style>
-      /* Sidebar Styling */
-      .sidebar {
-        width: 250px;
-        height: 100vh;
-        background-color: #1e1e1e;
-        color: white;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between; /* Ensure the footer is at the bottom */
-      }
 
-      .sidebar-logo {
-        width: 100%; /* Makes the logo stretch across the width */
-        max-width: 200px; /* Maximum width */
-        margin-bottom: 20px; /* Space below the logo */
-        display: block;
-        margin-left: auto;
-        margin-right: auto; /* Center the logo */
-      }
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="./styles/styles.css" />
+  <link rel="icon" href="../assets/logon_1733092227-trimmy-logo(1).ico" type="image/png" />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap" rel="stylesheet" />
+  <title>CyberChase</title>
+  <style>
+    /* Sidebar Styling */
+    .sidebar {
+      width: 250px;
+      height: 100vh;
+      background-color: #1e1e1e;
+      color: white;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      /* Ensure the footer is at the bottom */
+    }
 
-      /* Center the Navigation Links */
-      .sidebar ul {
-        list-style-type: none;
-        padding-left: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center; /* Center the links horizontally */
-        justify-content: center;
-      }
+    .sidebar-logo {
+      width: 100%;
+      /* Makes the logo stretch across the width */
+      max-width: 200px;
+      /* Maximum width */
+      margin-bottom: 20px;
+      /* Space below the logo */
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      /* Center the logo */
+    }
 
-      .sidebar ul li {
-        margin: 10px 0;
-      }
+    /* Center the Navigation Links */
+    .sidebar ul {
+      list-style-type: none;
+      padding-left: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      /* Center the links horizontally */
+      justify-content: center;
+    }
 
-      .sidebar ul li a {
-        color: white;
-        text-decoration: none;
-      }
+    .sidebar ul li {
+      margin: 10px 0;
+    }
 
-      .sidebar ul li a:hover {
-        text-decoration: underline;
-      }
+    .sidebar ul li a {
+      color: white;
+      text-decoration: none;
+    }
 
-      /* Footer with Names and IDs */
-      .sidebar-footer {
-        margin-top: auto; /* Push the footer to the bottom */
-        text-align: center; /* Center the text */
-        font-size: 16px; /* Increased font size */
-        font-weight: bold;
-        padding: 10px 0;
-        border-top: 1px solid #9a1d2e;
-      }
+    .sidebar ul li a:hover {
+      text-decoration: underline;
+    }
 
-      .sidebar-footer p {
-        margin: 5px 0;
-        color: white; /* Yellow color for the names */
-      }
+    /* Footer with Names and IDs */
+    .sidebar-footer {
+      margin-top: auto;
+      /* Push the footer to the bottom */
+      text-align: center;
+      /* Center the text */
+      font-size: 16px;
+      /* Increased font size */
+      font-weight: bold;
+      padding: 10px 0;
+      border-top: 1px solid #9a1d2e;
+    }
 
-      /* Content Section Styling */
-      .content {
-        margin-left: 250px; /* Make room for the sidebar */
-        padding: 20px;
-      }
+    .sidebar-footer p {
+      margin: 5px 0;
+      color: white;
+      /* Yellow color for the names */
+    }
 
-      #home {
-        text-align: center; /* Justify the text in the content */
-        max-width: 1200px; /* Limit the width for better readability */
-        margin: 0 auto;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="sidebar">
-      <!-- Logo Image -->
-      <img
-        src="../assets/logon_1733092227-trimmy-logo(1).ico"
-        alt="Logo"
-        class="sidebar-logo"
-      />
+    /* Content Section Styling */
+    .content {
+      margin-left: 250px;
+      /* Make room for the sidebar */
+      padding: 20px;
+    }
 
-      <ul>
-        <li><a href="./index.html">Home</a></li>
-        <li><a href="./metricas.html">Métricas</a></li>
-        <li><a href="./alertas.html">Alertas</a></li>
-        <li><a href="./agentes.html">Agentes</a></li>
-      </ul>
+    #home {
+      text-align: center;
+      /* Justify the text in the content */
+      max-width: 1200px;
+      /* Limit the width for better readability */
+      margin: 0 auto;
+    }
 
-      <!-- Footer with Names and IDs -->
-      <div class="sidebar-footer">
-        <p>Francisco Castro - a104433</p>
-        <p>João Cunha - a104611</p>
-        <p>João Sá - a104612</p>
-      </div>
+    /* Enlarge the Text */
+    #home p {
+      font-size: 18px;
+      /* Larger font size for paragraphs */
+      margin-top: 20px;
+      /* Add spacing between paragraphs */
+      line-height: 1.6;
+      /* Improve readability */
+    }
+
+    /* Styling for Image Below the Text */
+    #home img {
+      display: block;
+      margin: 30px auto;
+      max-width: 75%;
+      /* Ensure it scales properly */
+      height: auto;
+      /* Maintain aspect ratio */
+      border: 2px solid #9a1d2e;
+      /* Optional: Add border for visual appeal */
+      border-radius: 8px;
+      /* Optional: Add rounded corners */
+    }
+  </style>
+</head>
+
+<body>
+  <div class="sidebar">
+    <!-- Logo Image -->
+    <img src="../assets/logon_1733092227-trimmy-logo(1).ico" alt="Logo" class="sidebar-logo" />
+
+    <ul>
+      <li><a href="./index.html">Home</a></li>
+      <li><a href="./metricas.html">Métricas</a></li>
+      <li><a href="./alertas.html">Alertas</a></li>
+      <li><a href="./agentes.html">Agentes</a></li>
+    </ul>
+
+    <!-- Footer with Names and IDs -->
+    <div class="sidebar-footer">
+      <p>Francisco Castro - a104433</p>
+      <p>João Cunha - a104611</p>
+      <p>João Sá - a104612</p>
     </div>
+  </div>
 
-    <div class="content">
-      <section id="home">
-        <h1>Welcome to the Monitoring Dashboard!</h1>
-        <p>
-          This dashboard provides real-time metrics and alerts from your
-          monitoring project. You can easily track the performance of your
-          systems, view alerts, and analyze agent statistics.
-        </p>
-        <p>
-          Navigate through the sidebar to explore various metrics, alerts, and
-          agent performance statistics.
-        </p>
-        <p>
-          Stay informed and make data-driven decisions with our intuitive
-          interface!
-        </p>
-      </section>
-    </div>
-  </body>
+  <div class="content">
+    <section id="home">
+      <h1>Welcome to CyberChase!</h1>
+      <p>
+        Este painel fornece métricas e alertas em tempo real do nosso projeto de monitoramento. Você pode facilmente
+        acompanhar o desempenho dos seus sistemas, visualizar alertas e analisar estatísticas de agentes.
+      </p>
+      <p>
+        Navegue pelo menu lateral para explorar várias métricas, alertas e estatísticas de desempenho dos agentes.
+      </p>
+
+
+      <!-- Added Image Below Text -->
+      <img src="../assets/topologia.png" alt="Dashboard Preview" />
+    </section>
+  </div>
+</body>
+
 </html>
