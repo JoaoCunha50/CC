@@ -75,21 +75,6 @@ public class Json_parser {
                                 destIpAddress = InetAddress.getByName("0.0.0.0");
                             }
 
-                            // Exibir informações da tarefa para depuração
-                            System.out.println();
-                            System.out.println("===============================");
-                            System.out.println("Tarefa para agent_id: " + agent_id);
-                            System.out.println("task_type: " + task_type);
-                            System.out.println("frequency: " + frequency);
-                            System.out.println("alertflow_condition: " + alertflow_condition);
-                            System.out.println("mode: " + mode);
-                            System.out.println("destination_ip: "
-                                    + (destIpAddress != null ? destIpAddress : "Nenhum IP definido"));
-                            System.out.println("interfaceName: "
-                                    + (interfaceName != null ? interfaceName : "Nenhuma interface definida"));
-                            System.out.println("===============================");
-                            System.out.println();
-
                             // Criar tarefa com NetTask
                             NetTask handler = new NetTask();
                             byte[] taskPDU = handler.createTaskPDU(

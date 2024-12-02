@@ -4,8 +4,8 @@
         "tasks": [
             {
                 "task_type": 1,
-                "frequency": 3,
-                "alertflow_condition": 0
+                "frequency": 10,
+                "alertflow_condition": 100
             }
         ]
     },
@@ -14,8 +14,8 @@
         "tasks": [
             {
                 "task_type": 6,
-                "frequency": 1,
-                "alertflow_condition": 1,
+                "frequency": 8,
+                "alertflow_condition": 88,
                 "interfaceName": "eth0"
             }
         ]
@@ -26,7 +26,7 @@
             {
                 "task_type": 5,
                 "frequency": 0,
-                "alertflow_condition": 100,
+                "alertflow_condition": 70,
                 "mode": "server"
             }
         ]

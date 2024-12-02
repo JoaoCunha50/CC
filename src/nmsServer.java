@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.Scanner;
 
 import utils.*;
 import PDU.AlertFlow;
@@ -156,10 +157,9 @@ public class nmsServer {
             System.out.println("[TASK SENT] Task sent to agent " + agentID);
 
             boolean ackReceived = false;
-            int retries = 0;
 
             // Loop de retransmissão até receber ACK ou atingir limite de tentativas
-            while (!ackReceived && retries < 3) {
+            while (!ackReceived) {
                 try {
                     // Receber resposta
                     List<Object> receivedData = receivePacket();
@@ -183,9 +183,8 @@ public class nmsServer {
                         }
                     }
                 } catch (SocketTimeoutException e) {
-                    retries++;
                     System.out.println(
-                            "[RETRY] Retrying to send task to agent " + agentID + " (Attempt " + retries + ")");
+                            "[RETRY] Retrying to send task to agent " + agentID);
                     sendPacket(completeTask, clientAddress); // Reenviar tarefa
                 }
             }
@@ -239,7 +238,7 @@ public class nmsServer {
                 seqNumbers.addToExistingValue(agentID, seq_updated);
                 byte[] ackPDU = handler.createAckPDU(seq_updated);
                 int retries = 0;
-                while (retries < 2) {
+                while (retries < 3) {
                     sendPacket(ackPDU, clientAddress);
                     retries++;
                 }
@@ -249,7 +248,6 @@ public class nmsServer {
                 System.out.println("     taskUUID: " + pduUUID);
                 System.out.println("     taskType: " + taskType);
                 System.out.println("     metrics:  " + output);
-                System.out.println("     task_type:  " + taskType);
                 System.out.println();
 
                 System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
@@ -272,8 +270,8 @@ public class nmsServer {
             byte[] bufferTemp = Arrays.copyOfRange(dataEntry, 0, 43);
             String pduUUID = new String(Arrays.copyOfRange(bufferTemp, 0, 36), StandardCharsets.UTF_8);
             int type = Byte.toUnsignedInt(bufferTemp[36]);
-            byte[] ackBytes = Arrays.copyOfRange(bufferTemp, 37, 40);
-            int seqnum = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
+            byte[] seqBytes = Arrays.copyOfRange(bufferTemp, 37, 40);
+            int seqnum = ByteBuffer.wrap(new byte[] { 0, seqBytes[0], seqBytes[1], seqBytes[2] }).getInt();
             int taskType = Byte.toUnsignedInt(bufferTemp[40]);
             int threshold = Byte.toUnsignedInt(bufferTemp[41]);
             double outputMetric = Byte.toUnsignedInt(bufferTemp[42]);
@@ -302,13 +300,67 @@ public class nmsServer {
                 System.out.println("     taskUUID: " + pduUUID);
                 System.out.println("     metrics:  " + outputMetric);
                 System.out.println("     threshold:  " + threshold);
-                System.out.println("     task_type:  " + taskType);
+                System.out.println("     taskType:  " + taskType);
                 System.out.println();
 
                 System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
 
                 String agentID_String = "agent" + agentID;
                 OutputHandler.saveMetricsToJson(agentID_String, pduUUID, outputMetric, taskType);
+            }
+        } catch (IOException e) {
+            System.out.println("[ERROR] Error processing alert: " + e.getMessage());
+        }
+    }
+
+    private void processEndConnection(int seqnum, InetSocketAddress clientAddress) {
+        try {
+            NetTask handler = new NetTask();
+            byte[] endPDU = handler.createEndPDU(seqnum);
+            String pduUUID = new String(Arrays.copyOfRange(endPDU, 0, 36), StandardCharsets.UTF_8);
+
+            sendPacket(endPDU, clientAddress);
+            System.out.println("[END CONNECTION] Sending end of connection message");
+            System.out.println("     taskUUID: " + pduUUID);
+            System.out.println("     Sequence Number:  " + seqnum);
+            System.out.println();
+
+            int agentID = getIDfromIP(clientAddress);
+
+            boolean ackReceived = false;
+            while (!ackReceived) {
+                try {
+                    // Receber resposta
+                    List<Object> receivedData = receivePacket();
+                    byte[] response = (byte[]) receivedData.get(0); // Dados do pacote
+                    InetSocketAddress clientSocketAddress = (InetSocketAddress) receivedData.get(1);
+                    int currentSeq = seqNumbers.getSeqNumber(agentID);
+
+                    if (response != null && response.length > 0) {
+
+                        int typeInt = Byte.toUnsignedInt(response[36]); // Índice do tipo (penúltimo
+                                                                        // byte)
+                        byte[] ackBytes = Arrays.copyOfRange(response, response.length - 3, response.length); // Últimos
+                                                                                                              // 3 bytes
+                        int ackValue = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] })
+                                .getInt();
+
+                        // Verificar se o pacote é um ACK válido
+                        if (typeInt == NetTask.ACKNOWLEDGE && ackValue == currentSeq + endPDU.length) {
+                            ackReceived = true;
+                            System.out.println("[ACK RECEIVED] ACK received from agent " + agentID);
+                        } else {
+                            System.out.println("[Error] Invalid Ack");
+                        }
+                    }
+                } catch (SocketTimeoutException e) {
+                    System.out.println(
+                            "[RETRY] Retrying to send task to agent " + agentID);
+                    sendPacket(endPDU, clientAddress); // Reenviar tarefa
+                }
+            }
+            if (!ackReceived) {
+                System.out.println("[FAILED] Failed to receive ACK from agent " + agentID + " after 3 attempts");
             }
         } catch (IOException e) {
             System.out.println("[ERROR] Error processing alert: " + e.getMessage());
@@ -333,6 +385,34 @@ public class nmsServer {
         return null; // Retorna null se o valor não for encontrado
     }
 
+    // Método para fechar o servidor e liberar os recursos
+    private void closeServer() {
+        try {
+            // Fechar o socket TCP
+            if (TCPsocket != null && !TCPsocket.isClosed()) {
+                TCPsocket.close();
+                System.out.println("TCP Server socket closed.");
+            }
+
+            // Fechar o socket UDP
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+                System.out.println("UDP Server socket closed.");
+            }
+
+            // Fechar threads, se necessário
+            for (Thread agentThread : agentThreads.values()) {
+                if (agentThread.isAlive()) {
+                    agentThread.interrupt(); // Interromper os threads de agentes
+                }
+            }
+
+        } catch (IOException e) {
+            System.out.println("[ERROR] Error while closing server: " + e.getMessage());
+        }
+        System.exit(0);
+    }
+
     public void start() {
         System.out.println("Server started, waiting for packets...");
         System.out.println("UDP Port: " + PortaUDP);
@@ -340,44 +420,81 @@ public class nmsServer {
 
         // Thread para aceitar conexões TCP
         Thread tcpListener = new Thread(() -> {
-            while (true) {
+            while (!Thread.currentThread().isInterrupted()) {
                 try (Socket clientSocket = TCPsocket.accept()) {
                     handleTCPClient(clientSocket);
                 } catch (IOException e) {
-                    System.out.println("[ERROR] TCP Server error: " + e.getMessage());
+                    if (!Thread.currentThread().isInterrupted()) {
+                        System.out.println("[ERROR] TCP Server error: " + e.getMessage());
+                    }
                 }
             }
         });
         tcpListener.start();
 
-        // Enquanto o servidor estiver rodando, fica aguardando pacotes de agentes
-        while (true) {
-            try {
-                DatagramPacket packet = new DatagramPacket(new byte[1024], 1024);
-                socket.receive(packet);
+        // Loop principal para aguardar pacotes UDP
+        Thread udpListener = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    DatagramPacket packet = new DatagramPacket(new byte[1024], 1024);
+                    socket.receive(packet);
 
-                // Verifica o tipo do pacote (tarefa ou métrica)
-                byte[] data = Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
-                int type = Byte.toUnsignedInt(data[36]); // Assume que o tipo está nos 2 últimos bytes
+                    // Verifica o tipo do pacote (tarefa ou métrica)
+                    byte[] data = Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
+                    int type = Byte.toUnsignedInt(data[36]); // Assume que o tipo está nos 2 últimos bytes
 
-                // Se for uma métrica, processa
-                if (type == NetTask.METRICS) {
-                    processMetrics(packet);
-                } else {
-                    // Caso contrário, trata como uma requisição normal de tarefa
-                    Thread agentThread = new Thread(() -> {
-                        handleClient(packet);
-                    });
+                    // Se for uma métrica, processa
+                    if (type == NetTask.METRICS) {
+                        processMetrics(packet);
+                    } else {
+                        // Caso contrário, trata como uma requisição normal de tarefa
+                        Thread agentThread = new Thread(() -> {
+                            handleClient(packet);
+                        });
 
-                    int threadId = agentRegistry.size() + 1;
-                    agentThreads.put(threadId, agentThread);
-                    agentThread.start();
+                        int threadId = agentRegistry.size() + 1;
+                        agentThreads.put(threadId, agentThread);
+                        agentThread.start();
+                    }
+
+                } catch (IOException e) {
+                    if (!Thread.currentThread().isInterrupted()) {
+                        System.out.println("[ERROR] Server error: " + e.getMessage());
+                    }
                 }
-
-            } catch (IOException e) {
-                System.out.println("[ERROR] Server error: " + e.getMessage());
             }
-        }
+        });
+        udpListener.start();
+
+        // Scanner para monitorar a entrada do teclado
+        Scanner scanner = new Scanner(System.in);
+
+        // Monitorar entrada do teclado para fechar o servidor
+        Thread inputMonitor = new Thread(() -> {
+            while (true) {
+                String input = scanner.nextLine();
+                if (input.equalsIgnoreCase("q")) {
+                    boolean connectionsAreActive = !agentRegistry.isEmpty();
+
+                    if (connectionsAreActive) {
+                        for (Map.Entry<Integer, InetSocketAddress> entry : agentRegistry.entrySet()) {
+                            int agentID = entry.getKey();
+                            InetSocketAddress clientAddress = entry.getValue();
+
+                            int seq = seqNumbers.getSeqNumber(agentID);
+
+                            processEndConnection(seq, clientAddress);
+                        }
+                    }
+                    tcpListener.interrupt();
+                    udpListener.interrupt();
+                    closeServer();
+                    System.out.println("Server shut down successfully.");
+                    break; // Exit the loop and end the server
+                }
+            }
+        });
+        inputMonitor.start();
     }
 
     public static void main(String[] args) {
