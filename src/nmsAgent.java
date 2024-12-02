@@ -33,7 +33,7 @@ public class nmsAgent {
         this.outputTCP = TCPSocket.getOutputStream();
         this.inputTCP = TCPSocket.getInputStream();
         System.out.println("[AGENT] TCP socket connected to server at " + servidorIP + ":" + porta);
-        
+
         this.agentExecutor = Executors.newFixedThreadPool(2);
         this.seqnum_atual = 1;
         this.lock = new ReentrantLock();
@@ -75,17 +75,27 @@ public class nmsAgent {
             sendByteArray(registerPDU);
             System.out.println("[REGISTER SENT] Register PDU sent.");
 
-            // Receber resposta
-            byte[] response = receiveByteArray();
-            if (response != null && response.length > 0) {
-                int typeInt = Byte.toUnsignedInt(response[response.length - 4]); // Ler o tipo (4º byte antes do final)
+            try {
 
-                // Ler os 3 últimos bytes do seqNum (ACK)
-                byte[] ackBytes = Arrays.copyOfRange(response, response.length - 3, response.length);
-                int ackInt = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
+                byte[] response = receiveByteArray();
+                if (response != null && response.length > 0) {
+                    int typeInt = Byte.toUnsignedInt(response[response.length - 4]); // Ler o tipo (4º byte antes do
+                                                                                     // final)
 
-                if (waitForAck(typeInt, ackInt, registerPDU)) {
-                    System.out.println("[ACK RECEIVED] ACK received. Register successful.\n");
+                    // Ler os 3 últimos bytes do seqNum (ACK)
+                    byte[] ackBytes = Arrays.copyOfRange(response, response.length - 3, response.length);
+                    int ackInt = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
+
+                    if (waitForAck(typeInt, ackInt, registerPDU)) {
+                        System.out.println("[ACK RECEIVED] ACK received. Register successful.\n");
+                    }
+                }
+            } catch (SocketTimeoutException e) {
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                } else {
+                    System.out.println("[ERROR] Failed to receive acknowledgment, re-sending ...");
+                    sendByteArray(registerPDU);
                 }
             }
         } catch (IOException e) {
@@ -98,7 +108,7 @@ public class nmsAgent {
             System.out.println("Waiting for tasks...");
             System.out.println();
 
-            while (true) {
+            while (!Thread.currentThread().isInterrupted()) {
                 byte[] defaultBuffer = receiveByteArray();
                 int type = Byte.toUnsignedInt(defaultBuffer[36]);
 
@@ -229,13 +239,19 @@ public class nmsAgent {
                             sendMetrics(handlerPDU, taskOutput, taskType);
                         }
                     }
-
+                } else if (type == NetTask.END) {
+                    processEndPdu(defaultBuffer);
                 } else {
                     Thread.sleep(100);
                 }
             }
         } catch (IOException | InterruptedException e) {
-            System.out.println("Error receiving tasks: " + e.getMessage());
+            if (Thread.currentThread().isInterrupted()) {
+                System.out.println("[INFO] Thread interrompida, encerrando...");
+                return;
+            } else
+                System.out.println("Error receiving tasks: " + e.getMessage());
+
         }
     }
 
@@ -267,31 +283,31 @@ public class nmsAgent {
                 try {
                     byte[] ackPDU = receiveByteArray();
                     if (ackPDU != null && ackPDU.length > 0) {
-                        int typeInt = Byte.toUnsignedInt(ackPDU[ackPDU.length - 4]);
-                        byte[] ackBytes = Arrays.copyOfRange(ackPDU, ackPDU.length - 3, ackPDU.length);
+                        int typeInt = Byte.toUnsignedInt(ackPDU[36]);
+                        byte[] ackBytes = Arrays.copyOfRange(ackPDU, 37, 40);
                         int ackInt = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
 
                         if (waitForAck(typeInt, ackInt, metricsPDU)) {
                             ackReceived = true;
                             System.out.println("[ACK RECEIVED] Acknowledgment received successfully.");
-                        } else if (!waitForAck(typeInt, ackInt, metricsPDU)) {
+                        } else {
                             System.out.println("[ACK FAILED] Received invalid ACK. Retrying...");
                         }
                     } else {
-                        System.out.println("[ACK TIMEOUT] No acknowledgment received. Retrying...");
                         Thread.sleep(100);
                     }
-                } catch (IOException | InterruptedException e) {
-                    System.out.println("[ERROR] Failed to receive acknowledgment: " + e.getMessage());
+                } catch (SocketTimeoutException | InterruptedException e) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        return;
+                    } else {
+                        System.out.println("[ERROR] Failed to receive acknowledgment, re-sending ...");
+                        sendByteArray(metricsPDU);
+                    }
                 }
             }
 
-            if (!ackReceived) {
-                System.out.println("[ERROR] Failed to receive acknowledgment after " + maxRetries + " retries.");
-            }
         } catch (IOException e) {
             System.out.println("[ERROR] Task execution was interrupted: " + e.getMessage());
-            Thread.currentThread().interrupt(); // Restaure o estado de interrupção da thread
         }
     }
 
@@ -318,8 +334,8 @@ public class nmsAgent {
                 try {
                     byte[] ackBuffer = new byte[1024];
                     int bytesRead = inputTCP.read(ackBuffer);
-
-                    if (bytesRead > 0) {
+                    int retries = 0;
+                    if (bytesRead > 0 && retries < 3) {
                         byte[] ackPDU = Arrays.copyOfRange(ackBuffer, 0, bytesRead);
                         int typeInt = Byte.toUnsignedInt(ackPDU[36]);
                         byte[] ackBytes = Arrays.copyOfRange(ackPDU, 37, 40);
@@ -328,32 +344,97 @@ public class nmsAgent {
                         if (waitForAck(typeInt, ackInt, alertPDU)) {
                             ackReceived = true;
                             System.out.println("[ACK RECEIVED] Acknowledgment received successfully.");
-                        } else if (!waitForAck(typeInt, ackInt, alertPDU)) {
+                        } else {
                             System.out.println("[ACK FAILED] Received invalid ACK. Retrying...");
                         }
                     } else {
                         System.out.println("[ACK TIMEOUT] No acknowledgment received. Retrying...");
                         Thread.sleep(100);
+                        retries++;
                     }
-                } catch (IOException | InterruptedException e) {
-                    System.out.println("[ERROR] Failed to receive acknowledgment: " + e.getMessage());
+                } catch (SocketTimeoutException | InterruptedException e) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        return;
+                    } else {
+                        System.out.println("[ERROR] Failed to receive acknowledgment, re-sending ...");
+                        sendByteArray(alertPDU);
+                    }
                 }
             }
 
-            if (!ackReceived) {
-                System.out.println("[ERROR] Failed to receive acknowledgment after " + maxRetries + " retries.");
-            }
         } catch (IOException e) {
             System.out.println("[ERROR] Task execution was interrupted: " + e.getMessage());
-            Thread.currentThread().interrupt(); // Restaure o estado de interrupção da thread
+        }
+    }
+
+    public void processEndPdu(byte[] endPDU) {
+        try {
+            int type = Byte.toUnsignedInt(endPDU[36]); // Tipo do PDU
+            if (endPDU.length > 0 && type == NetTask.END) {
+
+                String pduUUID = new String(Arrays.copyOfRange(endPDU, 0, 36), StandardCharsets.UTF_8);
+
+                System.out.println("[END CONNECTION] Sending end of connection message");
+                System.out.println("     taskUUID: " + pduUUID);
+                System.out.println("     Sequence Number:  " + seqnum_atual);
+                System.out.println();
+
+                NetTask handler = new NetTask();
+                byte[] ackPDU = handler.createAckPDU(seqnum_atual + endPDU.length);
+
+                // Enviar o ACK
+                int retries = 0;
+                while (retries < 2) {
+                    sendByteArray(ackPDU);
+                    retries++;
+                }
+                System.out.println("[ACK SENT] ACK enviado para o servidor.");
+                closeConnection();
+            }
+        } catch (IOException e) {
+            if (Thread.currentThread().isInterrupted()) {
+                System.out.println("[INFO] Thread interrompida, encerrando...");
+                return;
+            } else
+                System.out.println("[ERROR] Failed to process PDU and send ACK: " + e.getMessage());
         }
     }
 
     public void closeConnection() {
-        if (socket != null) {
-            socket.close();
-            System.out.println("Conexão terminada\n");
+        System.out.println("[INFO] Initiating connection shutdown...");
+        if (agentExecutor != null) {
+            agentExecutor.shutdownNow();
         }
+
+        // Close sockets
+        if (socket != null && !socket.isClosed()) {
+            socket.close();
+            System.out.println("[INFO] UDP connection closed.");
+        }
+
+        if (TCPSocket != null && !TCPSocket.isClosed()) {
+            try {
+                TCPSocket.close();
+                System.out.println("[INFO] TCP connection closed.");
+            } catch (IOException e) {
+                System.err.println("[ERROR] Error closing TCP socket: " + e.getMessage());
+            }
+        }
+
+        // Close input and output streams
+        try {
+            if (outputTCP != null) {
+                outputTCP.close();
+            }
+            if (inputTCP != null) {
+                inputTCP.close();
+            }
+        } catch (IOException e) {
+            System.err.println("[ERROR] Error closing streams: " + e.getMessage());
+        }
+
+        // Force exit the program
+        System.exit(0);
     }
 
     public void start() {
