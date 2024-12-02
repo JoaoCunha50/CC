@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="../pages/styles/styles.css" />
+    <link
+      rel="icon"
+      href="../assets/logon_1733092227-trimmy-logo(1).ico"
+      type="image/png"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <title>CyberChase - Métricas</title>
+    <style>
+      .legend {
+        margin-top: 10px;
+        padding: 5px;
+        padding-bottom: 25px;
+        font-size: 15px;
+        color: #efefef; /* Cinza Rato */
+      }
+      .legend ul {
+        list-style-type: none;
+        padding-left: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px; /* Espaçamento entre os itens */
+      }
+      .legend li {
+        margin: 0;
+      }
+      /* Logo in Sidebar */
+      .sidebar-logo {
+        width: 100%; /* Makes the logo stretch across the width */
+        max-width: 200px; /* Maximum width */
+        margin-bottom: 20px; /* Space below the logo */
+        display: block;
+        margin-left: auto;
+        margin-right: auto; /* Center the logo */
+      }
+
+      /* Sidebar Styling */
+      .sidebar {
+        width: 250px;
+        height: 100vh;
+        background-color: #1e1e1e;
+        color: white;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between; /* Ensure the footer is at the bottom */
+      }
+
+      /* Center the Navigation Links */
+      .sidebar ul {
+        list-style-type: none;
+        padding-left: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* Center the links horizontally */
+        justify-content: center;
+      }
+
+      .sidebar ul li {
+        margin: 10px 0;
+      }
+
+      .sidebar ul li a {
+        color: white;
+        text-decoration: none;
+      }
+
+      .sidebar ul li a:hover {
+        text-decoration: underline;
+      }
+
+      /* Footer with Names and IDs */
+      .sidebar-footer {
+        margin-top: auto; /* Push the footer to the bottom */
+        text-align: center; /* Center the text */
+        font-size: 16px; /* Increased font size */
+        font-weight: bold;
+        padding: 10px 0;
+        border-top: 1px solid #9a1d2e;
+      }
+
+      .sidebar-footer p {
+        margin: 5px 0;
+        color: white; /* Yellow color for the names */
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sidebar">
+      <!-- Logo Image -->
+      <img
+        src="../assets/logon_1733092227-trimmy-logo(1).ico"
+        alt="Logo"
+        class="sidebar-logo"
+      />
+
+      <ul>
+        <li><a href="./index.html">Home</a></li>
+        <li><a href="./metricas.html">Métricas</a></li>
+        <li><a href="./alertas.html">Alertas</a></li>
+        <li><a href="./agentes.html">Agentes</a></li>
+      </ul>
+
+      <!-- Footer with Names and IDs -->
+      <div class="sidebar-footer">
+        <p>Francisco Castro - a104433</p>
+        <p>João Cunha - a104611</p>
+        <p>João Sá - a104612</p>
+      </div>
+    </div>
+
+    <div class="content">
+      <section id="metricas">
+        <h1>Métricas</h1>
+
+        <!-- Table to display data -->
+        <table id="metricsTable">
+          <thead>
+            <tr>
+              <th>AgentID</th>
+              <th>UUID</th>
+              <th>Type</th>
+              <th>Output</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamic data will be populated here -->
+          </tbody>
+        </table>
+
+        <!-- Legenda explicativa -->
+        <div class="legend">
+          <ul>
+            <li><strong>0</strong>: CPU</li>
+            <li><strong>1</strong>: RAM</li>
+            <li><strong>2</strong>: LATENCY</li>
+            <li><strong>3</strong>: BANDWIDTH</li>
+            <li><strong>4</strong>: JITTER</li>
+            <li><strong>5</strong>: PACKET LOSS</li>
+            <li><strong>6</strong>: INTERFACE</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+
+    <!-- Link to external JS file -->
+    <script src="../scripts/metrics.js"></script>
+  </body>
+</html>

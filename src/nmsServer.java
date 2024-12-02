@@ -306,7 +306,7 @@ public class nmsServer {
                 System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
 
                 String agentID_String = "agent" + agentID;
-                OutputHandler.saveMetricsToJson(agentID_String, pduUUID, outputMetric, taskType);
+                OutputHandler.saveAlertsToJson(agentID_String, pduUUID, outputMetric, taskType, threshold);
             }
         } catch (IOException e) {
             System.out.println("[ERROR] Error processing alert: " + e.getMessage());

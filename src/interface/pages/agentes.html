@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="../pages/styles/styles.css" />
+    <link
+      rel="icon"
+      href="../assets/logon_1733092227-trimmy-logo(1).ico"
+      type="image/png"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <title>CyberChase - Agentes</title>
+    <style>
+      /* Sidebar Styling */
+      .sidebar {
+        width: 250px;
+        height: 100vh;
+        background-color: #1e1e1e;
+        color: white;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between; /* Ensure the footer is at the bottom */
+      }
+
+      /* Logo in Sidebar */
+      .sidebar-logo {
+        width: 100%; /* Makes the logo stretch across the width */
+        max-width: 200px; /* Maximum width */
+        margin-bottom: 20px; /* Space below the logo */
+        display: block;
+        margin-left: auto;
+        margin-right: auto; /* Center the logo */
+      }
+
+      /* Center the Navigation Links */
+      .sidebar ul {
+        list-style-type: none;
+        padding-left: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* Center the links horizontally */
+        justify-content: center;
+      }
+
+      .sidebar ul li {
+        margin: 10px 0;
+      }
+
+      .sidebar ul li a {
+        color: white;
+        text-decoration: none;
+      }
+
+      .sidebar ul li a:hover {
+        text-decoration: underline;
+      }
+
+      /* Footer with Names and IDs */
+      .sidebar-footer {
+        margin-top: auto; /* Push the footer to the bottom */
+        text-align: center; /* Center the text */
+        font-size: 16px; /* Increased font size */
+        font-weight: bold;
+        padding: 10px 0;
+        border-top: 1px solid #9a1d2e;
+      }
+
+      .sidebar-footer p {
+        margin: 5px 0;
+        color: white; /* Yellow color for the names */
+      }
+
+      /* Content Section Styling */
+      .content {
+        margin-left: 250px; /* Make room for the sidebar */
+        padding: 20px;
+      }
+
+      /* Agent Card Styling */
+      .agent-card {
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        max-width: 300px;
+        min-width: 250px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border: 2px solid #9a1d2e; /* Thin red border */
+      }
+
+      .agent-card:hover {
+        transform: translateY(-5px); /* Card lift effect on hover */
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+      }
+
+      .agent-card h2 {
+        margin-bottom: 15px;
+        font-size: 1.5em;
+      }
+
+      .agent-card p {
+        font-size: 1.2em;
+        margin: 5px 0;
+      }
+
+      /* Agent Container */
+      .agent-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sidebar">
+      <!-- Logo Image -->
+      <img
+        src="../assets/logon_1733092227-trimmy-logo(1).ico"
+        alt="Logo"
+        class="sidebar-logo"
+      />
+
+      <ul>
+        <li><a href="./index.html">Home</a></li>
+        <li><a href="./metricas.html">Métricas</a></li>
+        <li><a href="./alertas.html">Alertas</a></li>
+        <li><a href="./agentes.html">Agentes</a></li>
+      </ul>
+
+      <!-- Footer with Names and IDs -->
+      <div class="sidebar-footer">
+        <p>Francisco Castro - a104433</p>
+        <p>João Cunha - a104611</p>
+        <p>João Sá - a104612</p>
+      </div>
+    </div>
+
+    <div class="content">
+      <section id="agents">
+        <h1>Agentes</h1>
+        <div class="agent-container" id="agentContainer">
+          <!-- Agent cards will be populated dynamically here -->
+        </div>
+      </section>
+    </div>
+
+    <script src="../scripts/agentCards.js"></script>
+    <!-- Link to the external JS -->
+  </body>
+</html>
