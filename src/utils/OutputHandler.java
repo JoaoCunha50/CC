@@ -5,6 +5,8 @@ import java.io.FileWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -44,12 +46,15 @@ public class OutputHandler {
                 taskList = new JSONArray(); // Se não existir, cria uma nova lista
             }
 
-            // Cria um objeto JSON para a nova task, incluindo taskType, taskUUID e metrics
-            // na ordem correta
+            // Cria um objeto JSON para a nova task, incluindo taskType, taskUUID, metrics e timestamp
             JSONObject task = new JSONObject();
-            task.put("taskType", taskType); // Adiciona o taskType
-            task.put("metrics", metrics); // Adiciona as métricas
-            task.put("taskUUID", taskUUID); // Adiciona o taskUUID
+            task.put("taskType", taskType);
+            task.put("metrics", metrics);
+            task.put("taskUUID", taskUUID);
+            
+            // Adiciona o timestamp
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+            task.put("timestamp", timestamp);
 
             // Adiciona a nova task na lista do agente
             taskList.add(task);
@@ -100,13 +105,16 @@ public class OutputHandler {
                 taskList = new JSONArray(); // Se não existir, cria uma nova lista
             }
 
-            // Cria um objeto JSON para a nova task, incluindo taskType, taskUUID e metrics
-            // na ordem correta
+            // Cria um objeto JSON para a nova task, incluindo taskType, taskUUID, metrics e timestamp
             JSONObject task = new JSONObject();
-            task.put("taskType", taskType); // Adiciona o taskType
-            task.put("metrics", metrics); // Adiciona as métricas
-            task.put("taskUUID", taskUUID); // Adiciona o taskUUID
+            task.put("taskType", taskType);
+            task.put("metrics", metrics);
+            task.put("taskUUID", taskUUID);
             task.put("threshold", threshold);
+            
+            // Adiciona o timestamp
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+            task.put("timestamp", timestamp);
 
             // Adiciona a nova task na lista do agente
             taskList.add(task);
