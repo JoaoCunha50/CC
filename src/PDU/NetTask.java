@@ -33,7 +33,7 @@ public class NetTask implements Serializable {
     }
 
     public byte[] createAckPDU(int ackValue) {
-        String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
+        String uuid = UUID.randomUUID().toString();
         int type = ACKNOWLEDGE;
 
         byte type_byte = (byte) type;
@@ -208,7 +208,7 @@ public class NetTask implements Serializable {
         return interfaceTaskPDU;
     }
 
-    public byte[] createOutput(double outputValue, int taskType) {
+    public byte[] createOutput(double outputValue, int taskType, int seq) {
         String uuid = UUID.randomUUID().toString(); // Gerar UUID como string
         int type = METRICS;
 
@@ -221,11 +221,14 @@ public class NetTask implements Serializable {
         byte output_byte = (byte) outputValue;
         byte taskType_byte = (byte) taskType;
 
+        byte[] seq_bytes = ByteBuffer.allocate(4).putInt(seq).array(); // Alocar 3 bytes para ackValue
+
         // Criar um ByteBuffer para conter o tipo e o UUID
-        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 3);
+        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 1 + 1 + 3 + 1);
 
         buffer.put(uuidBytes); // Coloca os bytes do UUID no buffer
         buffer.put(type_byte); // Coloca o tipo (int) no buffer
+        buffer.put(seq_bytes, 1, 3); // Pega os últimos 3 bytes de seq e os coloca no buffer
         buffer.put(taskType_byte); // coloca o task type (int) no buffer
         buffer.put(output_byte); // colocar o output no buffer
 

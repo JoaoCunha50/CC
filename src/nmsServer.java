@@ -24,6 +24,7 @@ public class nmsServer {
     private Map<Integer, InetSocketAddress> agentRegistry = new ConcurrentHashMap<>();
     private Map<Integer, Thread> agentThreads = new HashMap<>();
     private Map<Integer, List<byte[]>> tasksMap = new ConcurrentHashMap<>();
+    private List<String> received_UUID = new ArrayList<>();
     SeqManager seqNumbers = new SeqManager();
     private ReentrantLock lock = new ReentrantLock();
 
@@ -53,9 +54,74 @@ public class nmsServer {
         InetAddress clientAddress = packet.getAddress();
         int clientPort = packet.getPort(); // Obter a porta do cliente
         byte[] data = Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
+        String uuid = Arrays.copyOfRange(data, 0, 36).toString();
+
+        if (!received_UUID.contains(uuid)) {
+            received_UUID.add(uuid);
+        }
 
         // Retorna dados e InetSocketAddress
         return Arrays.asList(data, new InetSocketAddress(clientAddress, clientPort));
+    }
+
+    private boolean sendWithRetry(byte[] data, InetSocketAddress clientAddress, int maxRetries) {
+        int retryCount = 0;
+        while (retryCount < maxRetries) {
+            try {
+                sendPacket(data, clientAddress);
+                // Wait for acknowledgment with timeout
+                if (waitForAcknowledgment(data)) {
+                    return true;
+                }
+
+                // Apply exponential backoff
+                Thread.sleep(1000);
+                retryCount++;
+            } catch (IOException | InterruptedException e) {
+                System.out.println("[RETRY] Transmission error: " + e.getMessage());
+                retryCount++;
+            }
+        }
+        return false;
+    }
+
+    private boolean waitForAcknowledgment(byte[] pdu) throws IOException {
+        try {
+            socket.setSoTimeout(5000); // 5-second timeout
+            List<Object> data = receivePacket();
+            byte[] response = (byte[]) data.get(0);
+            InetSocketAddress clientAddress = (InetSocketAddress) data.get(1);
+            String uuid = Arrays.copyOfRange(response, 0, 36).toString();
+            int typeInt = Byte.toUnsignedInt(response[response.length - 4]); // Ler o tipo (4º byte antes do
+                                                                             // final)
+            int agentID = getIDfromIP(clientAddress);
+
+            // Ler os 3 últimos bytes do seqNum (ACK)
+            byte[] ackBytes = Arrays.copyOfRange(response, response.length - 3, response.length);
+            int ackInt = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
+
+            // Validate acknowledgment logic here
+            return validateAcknowledgment(typeInt, ackInt, pdu, seqNumbers.getSeqNumber(agentID), agentID);
+        } catch (SocketTimeoutException e) {
+            return false;
+        } finally {
+            socket.setSoTimeout(0); // Reset timeout
+        }
+    }
+
+    public boolean validateAcknowledgment(int type, int ackValue, byte[] pdu, int seqnum_atual, int agentID) {
+        lock.lock();
+        try {
+            if (type == NetTask.ACKNOWLEDGE && ackValue == (seqnum_atual + pdu.length)) {
+                seqNumbers.addToExistingValue(agentID, ackValue);
+                System.out.println(ackValue);
+                return true;
+            } else {
+                return false;
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void handleTCPClient(Socket clientSocket) {
@@ -77,43 +143,51 @@ public class nmsServer {
         try {
             byte[] dataEntry = packet.getData();
             byte[] data = Arrays.copyOfRange(dataEntry, 0, 40);
+            String dataUUID = Arrays.copyOfRange(dataEntry, 0, 36).toString();
             InetSocketAddress clientAddress = new InetSocketAddress(packet.getAddress(), packet.getPort());
 
-            // Check if this client is already registered
-            if (agentRegistry.containsValue(clientAddress)) {
-                return;
-            }
-
             int type = Byte.toUnsignedInt(data[data.length - 4]); // Ler o tipo (penúltimo byte antes de seqNum)
-
             if (type == NetTask.REGISTER) {
-                // Synchronize the registration process
-                int agentId = register(clientAddress);
-                agentRegistry.put(agentId, clientAddress);
-
                 // Ler os 3 bytes do seqNum
                 byte[] seqBytes = Arrays.copyOfRange(data, data.length - 3, data.length); // Últimos 3 bytes
-                int seqNum = ByteBuffer.wrap(new byte[] { 0, seqBytes[0], seqBytes[1], seqBytes[2] }).getInt(); // Converte
-                                                                                                                // para
-                                                                                                                // int
+                int seqNum = ByteBuffer.wrap(new byte[] { 0, seqBytes[0], seqBytes[1], seqBytes[2] }).getInt();
 
-                seqNumbers.addRegistry(agentId, seqNum);
+                // Synchronize the registration process
+                if (!agentRegistry.containsValue(clientAddress) && !received_UUID.contains(dataUUID)) {
+                    received_UUID.add(dataUUID);
+                    int agentId = register(clientAddress);
+                    agentRegistry.put(agentId, clientAddress);
 
-                System.out.println(
-                        "[REGISTER RECEIVED] Agent registered: ID = " + agentId + " IP: "
-                                + clientAddress.getAddress());
+                    seqNumbers.addRegistry(agentId, seqNum);
 
-                int seqValue = seqNumbers.getSeqNumber(agentId);
-                int nextSeqNum = seqNumbers.getNextSeqNum(data, seqValue); // Gere o próximo seqNum
-                seqNumbers.addToExistingValue(agentId, nextSeqNum);
+                    System.out.println(
+                            "[REGISTER RECEIVED] Agent registered: ID = " + agentId + " IP: "
+                                    + clientAddress.getAddress());
 
-                NetTask handler = new NetTask();
-                byte[] ackPDU = handler.createAckPDU(nextSeqNum); // Enviar o próximo seqNum no ACK
-                sendPacket(ackPDU, clientAddress);
+                    int seqValue = seqNumbers.getSeqNumber(agentId);
+                    int nextSeqNum = seqNumbers.getNextSeqNum(data, seqValue); // Gere o próximo seqNum
+                    seqNumbers.addToExistingValue(agentId, nextSeqNum);
 
-                System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentId);
+                    NetTask handler = new NetTask();
+                    byte[] ackPDU = handler.createAckPDU(nextSeqNum);
 
-                sendTasks(agentId);
+                    sendPacket(ackPDU, clientAddress);
+
+                    System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentId);
+
+                    sendTasks(agentId);
+                } else {
+                    int agentId = getIDfromIP(clientAddress);
+                    int nextSeqNum = seqNumbers.getNextSeqNum(data, seqNum); // Gere o próximo seqNum
+                    seqNumbers.addToExistingValue(agentId, nextSeqNum);
+
+                    NetTask handler = new NetTask();
+                    byte[] ackPDU = handler.createAckPDU(nextSeqNum); // Enviar o próximo seqNum no ACK
+
+                    sendPacket(ackPDU, clientAddress);
+
+                    sendTasks(agentId);
+                }
             }
         } catch (IOException e) {
             System.out.println("Error processing client: " + e.getMessage());
@@ -153,44 +227,12 @@ public class nmsServer {
             byte[] completeTask = insertSeqNumber(task, currentSeq);
 
             // Enviar tarefa ao agente
-            sendPacket(completeTask, clientAddress);
+            boolean ackReceived = false;
+            ackReceived = sendWithRetry(completeTask, clientAddress, 5);
             System.out.println("[TASK SENT] Task sent to agent " + agentID);
 
-            boolean ackReceived = false;
-
-            // Loop de retransmissão até receber ACK ou atingir limite de tentativas
-            while (!ackReceived) {
-                try {
-                    // Receber resposta
-                    List<Object> receivedData = receivePacket();
-                    byte[] response = (byte[]) receivedData.get(0); // Dados do pacote
-                    InetSocketAddress clientSocketAddress = (InetSocketAddress) receivedData.get(1);
-
-                    if (response != null && response.length > 0) {
-                        // Extração do tipo e valor do ACK
-                        int typeInt = Byte.toUnsignedInt(response[response.length - 4]); // Índice do tipo (penúltimo
-                                                                                         // byte)
-                        byte[] ackBytes = Arrays.copyOfRange(response, response.length - 3, response.length); // Últimos
-                                                                                                              // 3 bytes
-                        int ackValue = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] })
-                                .getInt();
-
-                        // Verificar se o pacote é um ACK válido
-                        if (typeInt == NetTask.ACKNOWLEDGE && ackValue == currentSeq + completeTask.length) {
-                            seqNumbers.addToExistingValue(agentID, ackValue);
-                            ackReceived = true;
-                            System.out.println("[ACK RECEIVED] ACK received from agent " + agentID);
-                        }
-                    }
-                } catch (SocketTimeoutException e) {
-                    System.out.println(
-                            "[RETRY] Retrying to send task to agent " + agentID);
-                    sendPacket(completeTask, clientAddress); // Reenviar tarefa
-                }
-            }
-
-            if (!ackReceived) {
-                System.out.println("[FAILED] Failed to receive ACK from agent " + agentID + " after 3 attempts");
+            if (ackReceived) {
+                System.out.println("[ACK RECEIVED] ACK received from agent " + agentID);
             }
         }
     }
@@ -216,16 +258,19 @@ public class nmsServer {
     }
 
     private void processMetrics(DatagramPacket packet) {
+        lock.lock();
         try {
             NetTask handler = new NetTask();
             byte[] dataEntry = packet.getData();
             InetSocketAddress clientAddress = new InetSocketAddress(packet.getAddress(), packet.getPort());
 
-            byte[] bufferTemp = Arrays.copyOfRange(dataEntry, 0, 39);
+            byte[] bufferTemp = Arrays.copyOfRange(dataEntry, 0, 42);
             String pduUUID = new String(Arrays.copyOfRange(bufferTemp, 0, 36), StandardCharsets.UTF_8);
             int type = Byte.toUnsignedInt(bufferTemp[36]);
-            int taskType = Byte.toUnsignedInt(bufferTemp[37]);
-            double output = Byte.toUnsignedInt(bufferTemp[38]);
+            byte[] seqBytes = Arrays.copyOfRange(bufferTemp, 37, 40);
+            int seqnum = ByteBuffer.wrap(new byte[] { 0, seqBytes[0], seqBytes[1], seqBytes[2] }).getInt();
+            int taskType = Byte.toUnsignedInt(bufferTemp[40]);
+            double output = Byte.toUnsignedInt(bufferTemp[41]);
 
             if (taskType == 5) { // para converter este output no seu valor real
                 output /= 10;
@@ -233,10 +278,12 @@ public class nmsServer {
 
             int agentID = getIDfromIP(clientAddress);
 
-            if (type == NetTask.METRICS) {
-                int seq_updated = seqNumbers.getNextSeqNum(bufferTemp, seqNumbers.getSeqNumber(agentID));
-                seqNumbers.addToExistingValue(agentID, seq_updated);
-                byte[] ackPDU = handler.createAckPDU(seq_updated);
+            if (type == NetTask.METRICS && !received_UUID.contains(pduUUID)) {
+                received_UUID.add(pduUUID);
+                int ack_updated = seqNumbers.getNextSeqNum(bufferTemp, seqnum);
+                seqNumbers.addToExistingValue(agentID, ack_updated);
+                System.out.println(ack_updated + " + " + seqnum);
+                byte[] ackPDU = handler.createAckPDU(ack_updated);
                 int retries = 0;
                 while (retries < 3) {
                     sendPacket(ackPDU, clientAddress);
@@ -255,13 +302,25 @@ public class nmsServer {
                 String agentID_String = "agent" + agentID;
                 OutputHandler.saveMetricsToJson(agentID_String, pduUUID, output, taskType);
 
+            } else if (type == NetTask.METRICS && received_UUID.contains(pduUUID)) {
+                int seq_updated = seqNumbers.getNextSeqNum(bufferTemp, seqnum);
+                seqNumbers.addToExistingValue(agentID, seq_updated);
+                byte[] ackPDU = handler.createAckPDU(seq_updated);
+                int retries = 0;
+                while (retries < 3) {
+                    sendPacket(ackPDU, clientAddress);
+                    retries++;
+                }
             }
         } catch (IOException e) {
             System.out.println("Error processing metrics: " + e.getMessage());
+        } finally {
+            lock.unlock();
         }
     }
 
     private void processAlerts(byte[] dataEntry, Socket clientSocket) {
+        lock.lock();
         try {
             NetTask handler = new NetTask();
             OutputStream output = clientSocket.getOutputStream();
@@ -284,7 +343,8 @@ public class nmsServer {
             int agentID = getIDfromTCPIP(clientAdress);
 
             // Processa alertas
-            if (type == AlertFlow.ALERT) {
+            if (type == AlertFlow.ALERT && !received_UUID.contains(pduUUID)) {
+                received_UUID.add(pduUUID);
                 int seqUpdated = seqNumbers.getNextSeqNum(bufferTemp, seqnum);
                 seqNumbers.addToExistingValue(agentID, seqUpdated);
 
@@ -306,10 +366,33 @@ public class nmsServer {
                 System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
 
                 String agentID_String = "agent" + agentID;
-                OutputHandler.saveAlertsToJson(agentID_String, pduUUID, outputMetric, taskType, threshold);
+                OutputHandler.saveMetricsToJson(agentID_String, pduUUID, outputMetric, taskType);
+
+            } else if (type == AlertFlow.ALERT && received_UUID.contains(pduUUID)) {
+                int ackUpdated = seqNumbers.getNextSeqNum(bufferTemp, seqnum);
+                seqNumbers.addToExistingValue(agentID, ackUpdated);
+
+                // Cria o ACK
+                byte[] ackPDU = handler.createAckPDU(ackUpdated);
+
+                // Envia o ACK pelo TCP
+                output.write(ackPDU);
+                output.flush();
+
+                // Exibe e salva as métricas
+                System.out.println("[ALERTFLOW] TASK OUTPUT EXCEEDED THRESHOLD:");
+                System.out.println("     taskUUID: " + pduUUID);
+                System.out.println("     metrics:  " + outputMetric);
+                System.out.println("     threshold:  " + threshold);
+                System.out.println("     taskType:  " + taskType);
+                System.out.println();
+
+                System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
             }
         } catch (IOException e) {
             System.out.println("[ERROR] Error processing alert: " + e.getMessage());
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -320,50 +403,15 @@ public class nmsServer {
             String pduUUID = new String(Arrays.copyOfRange(endPDU, 0, 36), StandardCharsets.UTF_8);
 
             sendPacket(endPDU, clientAddress);
-            System.out.println("[END CONNECTION] Sending end of connection message");
+
+            int agentID = getIDfromIP(clientAddress);
+            System.out.println("[END CONNECTION] Sending end of connection message to " + agentID);
             System.out.println("     taskUUID: " + pduUUID);
             System.out.println("     Sequence Number:  " + seqnum);
             System.out.println();
 
-            int agentID = getIDfromIP(clientAddress);
-
-            boolean ackReceived = false;
-            while (!ackReceived) {
-                try {
-                    // Receber resposta
-                    List<Object> receivedData = receivePacket();
-                    byte[] response = (byte[]) receivedData.get(0); // Dados do pacote
-                    InetSocketAddress clientSocketAddress = (InetSocketAddress) receivedData.get(1);
-                    int currentSeq = seqNumbers.getSeqNumber(agentID);
-
-                    if (response != null && response.length > 0) {
-
-                        int typeInt = Byte.toUnsignedInt(response[36]); // Índice do tipo (penúltimo
-                                                                        // byte)
-                        byte[] ackBytes = Arrays.copyOfRange(response, response.length - 3, response.length); // Últimos
-                                                                                                              // 3 bytes
-                        int ackValue = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] })
-                                .getInt();
-
-                        // Verificar se o pacote é um ACK válido
-                        if (typeInt == NetTask.ACKNOWLEDGE && ackValue == currentSeq + endPDU.length) {
-                            ackReceived = true;
-                            System.out.println("[ACK RECEIVED] ACK received from agent " + agentID);
-                        } else {
-                            System.out.println("[Error] Invalid Ack");
-                        }
-                    }
-                } catch (SocketTimeoutException e) {
-                    System.out.println(
-                            "[RETRY] Retrying to send task to agent " + agentID);
-                    sendPacket(endPDU, clientAddress); // Reenviar tarefa
-                }
-            }
-            if (!ackReceived) {
-                System.out.println("[FAILED] Failed to receive ACK from agent " + agentID + " after 3 attempts");
-            }
         } catch (IOException e) {
-            System.out.println("[ERROR] Error processing alert: " + e.getMessage());
+            System.out.println("[ERROR] Error sending endPDU " + e.getMessage());
         }
     }
 
@@ -407,9 +455,11 @@ public class nmsServer {
                 }
             }
 
-        } catch (IOException e) {
+            Thread.sleep(2000);
+        } catch (IOException | InterruptedException e) {
             System.out.println("[ERROR] Error while closing server: " + e.getMessage());
         }
+        System.out.println("Server closing...");
         System.exit(0);
     }
 

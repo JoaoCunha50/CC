@@ -5,7 +5,7 @@
             {
                 "task_type": 1,
                 "frequency": 10,
-                "alertflow_condition": 99
+                "alertflow_condition": 100
             }
         ]
     },
