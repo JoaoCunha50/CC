@@ -17,13 +17,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Lista de métricas
 const metricNames = [
-    "CPU",        // 0
-    "RAM",        // 1
-    "LATENCY",    // 2
-    "BANDWIDTH",  // 3
-    "JITTER",     // 4
-    "PACKET LOSS",// 5
-    "INTERFACE"   // 6
+    "cpu",        // 0
+    "ram",        // 1
+    "latency",    // 2
+    "bandwidth",  // 3
+    "jitter",     // 4
+    "packet loss",// 5
+    "interface"   // 6
 ];
 
 function populateTable(data) {
@@ -38,7 +38,7 @@ function populateTable(data) {
             // Create a new row
             const row = document.createElement("tr");
 
-            // Create and append cells for AgentID, UUID, Metric Type, and Output
+            // Create and append cells for AgentID, UUID, Metric Type, Output, and Timestamp
             const agentCell = document.createElement("td");
             agentCell.textContent = agentID;
             row.appendChild(agentCell);
@@ -55,6 +55,11 @@ function populateTable(data) {
             const outputCell = document.createElement("td");
             outputCell.textContent = metric.metrics;
             row.appendChild(outputCell);
+
+            // Add a new cell for the timestamp
+            const timestampCell = document.createElement("td");
+            timestampCell.textContent = metric.timestamp || "N/A"; // Default to "N/A" if timestamp is missing
+            row.appendChild(timestampCell);
 
             // Append the row to the table body
             tableBody.appendChild(row);

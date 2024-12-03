@@ -22,13 +22,29 @@ function calculateAverage(metrics) {
   return metrics.length > 0 ? (total / metrics.length).toFixed(2) : 'NA';
 }
 
-// Fetch para `alerts.json`
+// Inicialização do script
 fetch('../../../outputs/alerts.json')
-  .then(response => response.json())
+  .then(response => {
+    if (!response.ok) {
+      // Se o arquivo não for encontrado, retorna um objeto vazio
+      console.warn('alerts.json não encontrado. Continuando sem alertas.');
+      return {};
+    }
+    return response.json();
+  })
+  .catch(error => {
+    console.warn('Erro ao carregar alerts.json:', error);
+    return {}; // Retorna um objeto vazio se houver erro
+  })
   .then(alertData => {
-    // Fetch para `metrics.json`
+    // Carrega metrics.json independentemente do status de alerts.json
     fetch('../../../outputs/metrics.json')
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Falha ao carregar metrics.json: ${response.statusText}`);
+        }
+        return response.json();
+      })
       .then(agentData => {
         const container = document.getElementById('agentContainer');
 
@@ -99,9 +115,6 @@ fetch('../../../outputs/alerts.json')
         createAgentCards(agentData);
       })
       .catch(error => {
-        console.error('Error loading metrics.json:', error);
+        console.error('Erro ao carregar metrics.json:', error);
       });
-  })
-  .catch(error => {
-    console.error('Error loading alerts.json:', error);
   });
