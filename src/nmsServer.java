@@ -366,7 +366,7 @@ public class nmsServer {
                 System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
 
                 String agentID_String = "agent" + agentID;
-                OutputHandler.saveMetricsToJson(agentID_String, pduUUID, outputMetric, taskType);
+                OutputHandler.saveAlertsToJson(agentID_String, pduUUID, outputMetric, taskType, threshold);
 
             } else if (type == AlertFlow.ALERT && received_UUID.contains(pduUUID)) {
                 int ackUpdated = seqNumbers.getNextSeqNum(bufferTemp, seqnum);
