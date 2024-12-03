@@ -32,12 +32,11 @@ public class NetTask implements Serializable {
         return buffer.array();
     }
 
-    public byte[] createAckPDU(int ackValue) {
-        String uuid = UUID.randomUUID().toString();
+    public byte[] createAckPDU(int ackValue, byte[] uuidBytes) {
+        
         int type = ACKNOWLEDGE;
 
         byte type_byte = (byte) type;
-        byte[] uuidBytes = uuid.getBytes();
         byte[] ack_bytes = ByteBuffer.allocate(4).putInt(ackValue).array(); // Alocar 3 bytes para ackValue
 
         // Criar um ByteBuffer para conter o tipo, UUID e ackValue
