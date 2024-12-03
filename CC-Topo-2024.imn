@@ -5,25 +5,21 @@ node n1 {
 	hostname n1
 	!
 	interface eth2
-	 ip address 10.0.7.2/24
-	 mac address 00:00:00:aa:00:0f
+	 ip address 10.0.4.1/24
 	!
 	interface eth1
-	 ip address 10.0.3.1/24
-	 mac address 00:00:00:aa:00:06
+	 ip address 10.0.3.2/24
 	!
 	interface eth0
 	 ip address 10.0.0.1/24
-	 mac address 00:00:00:aa:00:00
 	!
     }
     canvas c1
-    iconcoords {271.0 322.0}
-    labelcoords {271.0 354.0}
-    services {zebra OSPFv2 OSPFv3 IPForward}
+    iconcoords {451.0 171.0}
+    labelcoords {451.0 203.0}
     interface-peer {eth0 n2}
-    interface-peer {eth1 n5}
-    interface-peer {eth2 n4}
+    interface-peer {eth1 n4}
+    interface-peer {eth2 n5}
 }
 
 node n2 {
@@ -33,22 +29,18 @@ node n2 {
 	hostname n2
 	!
 	interface eth2
-	 ip address 10.0.4.1/24
-	 mac address 00:00:00:aa:00:08
+	 ip address 10.0.5.1/24
 	!
 	interface eth1
 	 ip address 10.0.1.1/24
-	 mac address 00:00:00:aa:00:02
 	!
 	interface eth0
 	 ip address 10.0.0.2/24
-	 mac address 00:00:00:aa:00:01
 	!
     }
     canvas c1
-    iconcoords {484.0 152.0}
-    labelcoords {484.0 184.0}
-    services {zebra OSPFv2 OSPFv3 IPForward}
+    iconcoords {602.0 301.0}
+    labelcoords {602.0 333.0}
     interface-peer {eth0 n1}
     interface-peer {eth1 n3}
     interface-peer {eth2 n6}
@@ -61,22 +53,18 @@ node n3 {
 	hostname n3
 	!
 	interface eth2
-	 ip address 10.0.5.1/24
-	 mac address 00:00:00:aa:00:0a
+	 ip address 10.0.6.1/24
 	!
 	interface eth1
 	 ip address 10.0.2.1/24
-	 mac address 00:00:00:aa:00:04
 	!
 	interface eth0
 	 ip address 10.0.1.2/24
-	 mac address 00:00:00:aa:00:03
 	!
     }
     canvas c1
-    iconcoords {704.0 319.0}
-    labelcoords {704.0 351.0}
-    services {zebra OSPFv2 OSPFv3 IPForward}
+    iconcoords {473.0 458.0}
+    labelcoords {473.0 490.0}
     interface-peer {eth0 n2}
     interface-peer {eth1 n4}
     interface-peer {eth2 n7}
@@ -90,24 +78,20 @@ node n4 {
 	!
 	interface eth2
 	 ip address 10.0.7.1/24
-	 mac address 00:00:00:aa:00:0e
 	!
 	interface eth1
-	 ip address 10.0.6.1/24
-	 mac address 00:00:00:aa:00:0c
+	 ip address 10.0.3.1/24
 	!
 	interface eth0
 	 ip address 10.0.2.2/24
-	 mac address 00:00:00:aa:00:05
 	!
     }
     canvas c1
-    iconcoords {485.0 499.0}
-    labelcoords {485.0 531.0}
-    services {zebra OSPFv2 OSPFv3 IPForward}
+    iconcoords {311.0 331.0}
+    labelcoords {311.0 363.0}
     interface-peer {eth0 n3}
-    interface-peer {eth1 n8}
-    interface-peer {eth2 n1}
+    interface-peer {eth1 n1}
+    interface-peer {eth2 n8}
 }
 
 node n5 {
@@ -117,15 +101,33 @@ node n5 {
 	hostname PC1
 	!
 	interface eth0
-	 ip address 10.0.3.10/24
-	 mac address 00:00:00:aa:00:07
+	 ip address 10.0.4.10/24
 	!
     }
     canvas c1
-    iconcoords {25.0 321.0}
-    labelcoords {25.0 353.0}
-    services {DefaultRoute SSH}
+    iconcoords {452.0 30.0}
+    labelcoords {452.0 62.0}
     interface-peer {eth0 n1}
+    custom-config {
+	custom-config-id service:UserDefined
+	custom-command UserDefined
+	config {
+	files=('preenche_resolvconf.sh', )
+	cmdup=('mkdir -p /run/systemd/resolve', 'touch /run/systemd/resolve/stub-resolv.conf', 'sh preenche_resolvconf.sh', )
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:preenche_resolvconf.sh
+	custom-command preenche_resolvconf.sh
+	config {
+	preenche_resolvconf.sh
+	echo "# -- gerado pela script de arranque..." >> /etc/resolv.conf
+	echo "domain cc2024" >> /etc/resolv.conf
+	echo "nameserver 10.0.4.10" >> /etc/resolv.conf
+	echo "" >> /etc/resolv.conf 
+	}
+    }
+    services {DefaultRoute SSH UserDefined}
 }
 
 node n6 {
@@ -135,14 +137,12 @@ node n6 {
 	hostname PC2
 	!
 	interface eth0
-	 ip address 10.0.4.10/24
-	 mac address 00:00:00:aa:00:09
+	 ip address 10.0.5.10/24
 	!
     }
     canvas c1
-    iconcoords {483.0 29.0}
-    labelcoords {483.0 61.0}
-    services {DefaultRoute SSH}
+    iconcoords {886.0 304.0}
+    labelcoords {886.0 336.0}
     interface-peer {eth0 n2}
 }
 
@@ -153,14 +153,12 @@ node n7 {
 	hostname PC3
 	!
 	interface eth0
-	 ip address 10.0.5.10/24
-	 mac address 00:00:00:aa:00:0b
+	 ip address 10.0.6.10/24
 	!
     }
     canvas c1
-    iconcoords {938.0 316.0}
-    labelcoords {938.0 348.0}
-    services {DefaultRoute SSH}
+    iconcoords {472.0 616.0}
+    labelcoords {472.0 648.0}
     interface-peer {eth0 n3}
 }
 
@@ -171,14 +169,12 @@ node n8 {
 	hostname PC4
 	!
 	interface eth0
-	 ip address 10.0.6.10/24
-	 mac address 00:00:00:aa:00:0d
+	 ip address 10.0.7.10/24
 	!
     }
     canvas c1
-    iconcoords {486.0 634.0}
-    labelcoords {486.0 666.0}
-    services {DefaultRoute SSH}
+    iconcoords {43.0 332.0}
+    labelcoords {43.0 364.0}
     interface-peer {eth0 n4}
 }
 
@@ -188,41 +184,45 @@ link l1 {
 }
 
 link l2 {
-    ber 1.0
+    ber 1
     delay 5000
     nodes {n2 n3}
     bandwidth 5000000
 }
 
 link l3 {
-    ber 5.0
+    ber 5
     delay 10000
     nodes {n3 n4}
     bandwidth 2000000
 }
 
 link l4 {
-    nodes {n1 n5}
-}
-
-link l5 {
-    nodes {n2 n6}
-}
-
-link l6 {
-    nodes {n3 n7}
-}
-
-link l7 {
-    nodes {n4 n8}
-}
-
-link l8 {
     duplicate 10
-    ber 10.0
+    ber 10
     delay 20000
     nodes {n4 n1}
     bandwidth 1000000
+}
+
+link l5 {
+    nodes {n5 n1}
+    bandwidth 10000000
+}
+
+link l6 {
+    nodes {n6 n2}
+    bandwidth 10000000
+}
+
+link l7 {
+    nodes {n7 n3}
+    bandwidth 10000000
+}
+
+link l8 {
+    nodes {n8 n4}
+    bandwidth 10000000
 }
 
 canvas c1 {
@@ -243,16 +243,5 @@ option global {
 }
 
 option session {
-    controlnet=
-    controlnet0=
-    controlnet1=
-    controlnet2=
-    controlnet3=
-    controlnet_updown_script=
-    enablerj45=1
-    enablesdt=0
-    ovs=0
-    preservedir=0
-    sdturl=tcp://127.0.0.1:50000/
 }
 
