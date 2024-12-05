@@ -170,7 +170,7 @@ public class TasksHandler {
     }
 
     private static double getIperfBandwidth(String serverIp) {
-        String command = "iperf3 -c " + serverIp + " -t 10 -f m"; // "-f m" para exibir a largura de banda em Mbps
+        String command = "iperf3 -c " + serverIp + " -t 5 -f m"; // "-f m" para exibir a largura de banda em Mbps
         double bandwidth = -1.0; // Valor inicial negativo indicando que a largura de banda não foi encontrada.
 
         try {
@@ -217,7 +217,7 @@ public class TasksHandler {
         while (true) { // Loop para tentar reconectar em caso de "Connection refused"
             try {
                 // Comando para executar o iperf3
-                String command = "iperf3 -c " + serverIp + " -u -t 10";
+                String command = "iperf3 -c " + serverIp + " -u -t 5";
 
                 // Criação do processo
                 ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));
@@ -273,7 +273,7 @@ public class TasksHandler {
         while (true) { // Loop para tentar reconectar em caso de "Connection refused"
             try {
                 // Comando para executar o iperf3
-                String command = "iperf3 -c " + serverIp + " -u -t 10";
+                String command = "iperf3 -c " + serverIp + " -u -t 5";
 
                 // Criação do processo
                 ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));

@@ -2,6 +2,7 @@ package utils;
 
 import java.io.IOException;
 import java.net.*;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
@@ -14,6 +15,7 @@ public class NetworkUtils {
     private final List<String> received_UUID;
     private final BlockingQueue<PacketTask> sendQueue;
     private final List<PendingPacket> pendingPackets;
+    private final SeqManager seq_manager;
     private Thread sendThread;
     private Thread retransmitThread;
     private volatile boolean running;
@@ -23,6 +25,7 @@ public class NetworkUtils {
         this.received_UUID = new ArrayList<>(received_UUID);
         this.sendQueue = new LinkedBlockingQueue<>();
         this.pendingPackets = new ArrayList<>();
+        this.seq_manager = new SeqManager();
         this.running = true;
         startSendThread();
         startRetransmitThread();
@@ -57,6 +60,10 @@ public class NetworkUtils {
         return pendingPackets;
     }
 
+    public SeqManager getSeqManager() {
+        return seq_manager;
+    }
+
     public void addPendingPacket(String alertUUID, byte[] alertPDU) {
         this.pendingPackets.add(new PendingPacket(alertUUID, alertPDU, null, System.currentTimeMillis()));
     }
@@ -69,13 +76,13 @@ public class NetworkUtils {
         }
     }
 
-    public boolean isUUIDPending(String uuid) {
+    public byte[] isUUIDPending(String uuid) {
         for (PendingPacket pending : pendingPackets) {
             if (pending.uuid.equals(uuid)) {
-                return true;
+                return pending.data;
             }
         }
-        return false;
+        return null;
     }
 
     // Iniciar thread de envio
@@ -108,7 +115,7 @@ public class NetworkUtils {
                 for (PendingPacket packet : new ArrayList<>(pendingPackets)) {
                     if ((Byte.toUnsignedInt(packet.data[36]) != AlertFlow.ALERT)
                             && currentTime - packet.timestamp > 5000 && packet.retries < 3) {
-                                
+
                         System.out.println("[RETRANSMIT] UUID: " + packet.uuid);
                         System.out.println();
 
@@ -119,6 +126,7 @@ public class NetworkUtils {
                         System.out.println("[LOSS] Packet did not reach is destination");
                         System.out.println("        UUID: " + packet.uuid);
                         System.out.println();
+                        pendingPackets.remove(packet);
                     }
                 }
                 try {
@@ -165,10 +173,17 @@ public class NetworkUtils {
         // Verificar se é um ACK
         int type = Byte.toUnsignedInt(data[36]);
         if (type == NetTask.ACKNOWLEDGE) {
-            if (isUUIDPending(uuid)) {
+            byte[] ackBytes = Arrays.copyOfRange(data, 37, 40); // ACK sequence number
+            int ackInt = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
+
+            byte[] pendingpacket = isUUIDPending(uuid);
+
+            if (pendingpacket != null && ackInt == pendingpacket.length + seq_manager.getSeqNumber(clientAddress)) {
+                seq_manager.add(clientAddress, ackInt);
                 removePendingPacketByUUID(uuid);
                 System.out.println("[ACK RECEIVED] Acknowledgement received.");
-                System.out.println("        UUID: " + uuid);
+                System.out.println("           UUID: " + uuid);
+                System.out.println("           seqNum: " + ackInt);
                 System.out.println();
             }
         }
