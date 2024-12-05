@@ -21,10 +21,10 @@ public class Json_parser {
         this.file_path = file_path;
     }
 
-    public HashMap<Integer, List<byte[]>> tasks_parser() throws IOException, ParseException {
+    public HashMap<String, List<byte[]>> tasks_parser() throws IOException, ParseException {
         JSONParser parser = new JSONParser();
         FileReader reader = null;
-        HashMap<Integer, List<byte[]>> tasksMap = new HashMap<>(); // Mapeia agent_id -> lista de tarefas (byte[])
+        HashMap<String, List<byte[]>> tasksMap = new HashMap<>(); // Mapeia agent_id -> lista de tarefas (byte[])
 
         try {
             reader = new FileReader(this.file_path);
@@ -40,7 +40,7 @@ public class Json_parser {
                         continue;
                     }
 
-                    int agent_id = ((Long) agentJson.get("agent_id")).intValue();
+                    String agent_id = ((String) agentJson.get("agent_id"));
                     JSONArray tasksArray = (JSONArray) agentJson.get("tasks");
 
                     // Inicializar lista para armazenar tarefas do agente

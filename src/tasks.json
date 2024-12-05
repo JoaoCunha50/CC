@@ -1,39 +1,47 @@
 [
     {
-        "agent_id": 1,
+        "agent_id":"n4",
         "tasks": [
             {
-                "task_type": 1,
+                "task_type": 0,
                 "frequency": 10,
                 "alertflow_condition": 0
             },
             {
                 "task_type": 1,
-                "frequency": 2,
+                "frequency": 10,
                 "alertflow_condition": 99
             }
         ]
     },
     {
-        "agent_id": 2,
+        "agent_id": "PC3",
         "tasks": [
             {
-                "task_type": 6,
-                "frequency": 8,
+                "task_type": 5,
+                "frequency": 1,
                 "alertflow_condition": 88,
-                "interfaceName": "eth0"
+                "mode": "client",
+                "destination_ip": "10.0.7.10" 
             }
         ]
     },
     {
-        "agent_id": 3,
+        "agent_id": "PC4",
         "tasks": [
             {
                 "task_type": 5,
                 "frequency": 0,
                 "alertflow_condition": 70,
                 "mode": "server"
+            },
+            {
+                "task_type": 6,
+                "frequency": 10,
+                "alertflow_condition": 0,
+                "interfaceName": "eth0"
             }
+
         ]
     }
 ]

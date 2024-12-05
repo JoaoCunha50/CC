@@ -66,7 +66,6 @@ public class NetTask implements Serializable {
             case 6:
                 return createInterfaceTask(freq, threshold, interfaceName);
             default:
-                // Return null or some default value if taskType doesn't match any case
                 throw new IllegalArgumentException("Invalid task type: " + taskType);
         }
     }
@@ -223,7 +222,7 @@ public class NetTask implements Serializable {
         byte[] seq_bytes = ByteBuffer.allocate(4).putInt(seq).array(); // Alocar 3 bytes para ackValue
 
         // Criar um ByteBuffer para conter o tipo e o UUID
-        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 1 + 1 + 3 + 1);
+        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 1 + 3 + 1 + 1);
 
         buffer.put(uuidBytes); // Coloca os bytes do UUID no buffer
         buffer.put(type_byte); // Coloca o tipo (int) no buffer

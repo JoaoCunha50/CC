@@ -31,12 +31,14 @@ public class TasksHandler {
             case 4:
                 if (mode == 1) {
                     createIperfServer();
+                    return output;
                 } else if (mode == 0) {
                     return getIperfJitter(ip);
                 }
             case 5:
                 if (mode == 1) {
                     createIperfServer();
+                    return output;
                 } else if (mode == 0) {
                     return getIperfPacketLoss(ip);
                 }
@@ -332,38 +334,46 @@ public class TasksHandler {
         }
     }
 
-    public static double getInterfacePackets(String interfaceName) { // este valor ainda não está a 100% !!!!!!!
+    public static double getInterfacePackets(String interfaceName) {
         long initialPackets = 0;
         long finalPackets = 0;
 
         try {
-            // Caminho para o contador de pacotes transmitidos
-            String txPath = "/sys/class/net/" + interfaceName + "/statistics/tx_packets";
-
-            // Ler o valor inicial
-            initialPackets = readTxPackets(txPath);
+            // Usar netstat para obter pacotes transmitidos
+            initialPackets = getPacketsFromIp(interfaceName);
 
             // Aguardar 1 segundo
             Thread.sleep(1000);
 
-            // Ler o valor final
-            finalPackets = readTxPackets(txPath);
+            // Obter pacotes transmitidos após 1 segundo
+            finalPackets = getPacketsFromIp(interfaceName);
 
         } catch (Exception e) {
             e.printStackTrace();
             return -1.0; // Retornar -1.0 em caso de erro
         }
 
-        // Calcular a diferença e retornar como pacotes por segundo
+        // Calcular pacotes por segundo
         return finalPackets - initialPackets;
     }
 
-    // Método auxiliar para ler o valor de pacotes transmitidos
-    private static long readTxPackets(String filePath) throws IOException {
-        BufferedReader reader = new BufferedReader(new FileReader(filePath));
-        String line = reader.readLine();
-        reader.close();
-        return Long.parseLong(line.trim());
-    }
+    private static long getPacketsFromIp(String interfaceName) throws IOException {
+        Process process = Runtime.getRuntime().exec("ip -s link show " + interfaceName);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String line;
+        long txPackets = 0;
 
+        // Read the ip output to find the transmitted packets
+        while ((line = reader.readLine()) != null) {
+            if (line.contains("RX")) {
+                line = reader.readLine();
+                String[] parts = line.split("\\s+");
+                txPackets = Long.parseLong(parts[2]);
+                break;
+            }
+        }
+
+        reader.close();
+        return txPackets;
+    }
 }

@@ -26,6 +26,7 @@ function calculateAverage(metrics) {
 fetch('../../../outputs/alerts.json')
   .then(response => {
     if (!response.ok) {
+      // Se o arquivo não for encontrado, retorna um objeto vazio
       console.warn('alerts.json não encontrado. Continuando sem alertas.');
       return {};
     }
@@ -33,63 +34,45 @@ fetch('../../../outputs/alerts.json')
   })
   .catch(error => {
     console.warn('Erro ao carregar alerts.json:', error);
-    return {};
+    return {}; // Retorna um objeto vazio se houver erro
   })
   .then(alertData => {
     // Carrega metrics.json independentemente do status de alerts.json
     fetch('../../../outputs/metrics.json')
       .then(response => {
         if (!response.ok) {
-          console.warn(`Falha ao carregar metrics.json: ${response.statusText}`);
-          return {};
+          throw new Error(`Falha ao carregar metrics.json: ${response.statusText}`);
         }
         return response.json();
       })
-      .catch(error => {
-        console.warn('Erro ao carregar metrics.json:', error);
-        return {};
-      })
-      .then(metricData => {
+      .then(agentData => {
         const container = document.getElementById('agentContainer');
 
-        // Combinar agentes de alerts.json e metrics.json
-        const allAgents = new Set([
-          ...Object.keys(alertData),
-          ...Object.keys(metricData),
-        ]);
-
         // Função para criar cartões de agentes dinamicamente
-        function createAgentCards() {
-          allAgents.forEach(agent => {
-            const metrics = metricData[agent] || []; // Métricas do agent no metrics.json
-            const alerts = alertData[agent] || []; // Alertas do agent no alerts.json
-            const alertCount = alerts.length; // Número de alertas
-            const taskCount = metrics.length; // Número de métricas
-
-            // Ignorar agentes sem métricas e sem alertas
-            if (taskCount === 0 && alertCount === 0) return;
+        function createAgentCards(agentData) {
+          for (const agent in agentData) {
+            const metrics = agentData[agent];
+            const taskCount = metrics.length;
 
             // Nome do agente formatado (ex: "agent1" -> "Agent 1")
             const agentName = agent.replace(/^([a-zA-Z]+)(\d+)$/, (match, p1, p2) => `Agent ${p2}`);
 
+            // Obter número de alertas do `alerts.json` para este agente
+            const alertCount = alertData[agent]?.length || 0;
+
+            console.log(`Agent: ${agent}, Task Count: ${taskCount}, Alert Count: ${alertCount}`);
+            
             // Determinar o ícone correspondente com base no número de alertas
             const iconPath = getIconPath(alertCount);
 
-            // Filtrar métricas por tipo de tarefa e incluir alertas
-            const cpuMetrics = metrics.filter(item => item.taskType === 0).map(item => item.metrics)
-              .concat(alerts.filter(item => item.taskType === 0).map(item => item.metrics));
-            const ramMetrics = metrics.filter(item => item.taskType === 1).map(item => item.metrics)
-              .concat(alerts.filter(item => item.taskType === 1).map(item => item.metrics));
-            const packetLossMetrics = metrics.filter(item => item.taskType === 2).map(item => item.metrics)
-              .concat(alerts.filter(item => item.taskType === 2).map(item => item.metrics));
-            const latencyMetrics = metrics.filter(item => item.taskType === 3).map(item => item.metrics)
-              .concat(alerts.filter(item => item.taskType === 3).map(item => item.metrics));
-            const bandwidthMetrics = metrics.filter(item => item.taskType === 4).map(item => item.metrics)
-              .concat(alerts.filter(item => item.taskType === 4).map(item => item.metrics));
-            const jitterMetrics = metrics.filter(item => item.taskType === 5).map(item => item.metrics)
-              .concat(alerts.filter(item => item.taskType === 5).map(item => item.metrics));
-            const interfaceMetrics = metrics.filter(item => item.taskType === 6).map(item => item.metrics)
-              .concat(alerts.filter(item => item.taskType === 6).map(item => item.metrics));
+            // Filtrar métricas por tipo de tarefa
+            const cpuMetrics = metrics.filter(item => item.taskType === 0).map(item => item.metrics);
+            const ramMetrics = metrics.filter(item => item.taskType === 1).map(item => item.metrics);
+            const packetLossMetrics = metrics.filter(item => item.taskType === 2).map(item => item.metrics);
+            const latencyMetrics = metrics.filter(item => item.taskType === 3).map(item => item.metrics);
+            const bandwidthMetrics = metrics.filter(item => item.taskType === 4).map(item => item.metrics);
+            const jitterMetrics = metrics.filter(item => item.taskType === 5).map(item => item.metrics);
+            const interfaceMetrics = metrics.filter(item => item.taskType === 6).map(item => item.metrics);
 
             // Calcular as médias ou exibir "NA" se não houver dados
             const cpuAvg = calculateAverage(cpuMetrics);
@@ -108,27 +91,30 @@ fetch('../../../outputs/alerts.json')
 
             // Criar o HTML para o cartão do agente
             const card = `
-              <div class="agent-card">
-                <!-- Adicionar ícone no canto superior direito -->
-                <img src="${iconPath}" alt="Status Icon" style="position: absolute; top: 10px; right: 10px; width: 30px; height: 30px;" />
+                <div class="agent-card">
+                  <!-- Adicionar ícone no canto superior direito -->
+                  <img src="${iconPath}" alt="Status Icon" style="position: absolute; top: 10px; right: 10px; width: 30px; height: 30px;" />
 
-                <h2>${agentName}</h2>
-                <p><strong>CPU:</strong> ${appendUnit(cpuAvg, '%')}</p>
-                <p><strong>RAM:</strong> ${appendUnit(ramAvg, '%')}</p>
-                <p><strong>Packet Loss:</strong> ${appendUnit(packetLossAvg, '%')}</p>
-                <p><strong>Latency:</strong> ${appendUnit(latencyAvg, 'ms')}</p>
-                <p><strong>Bandwidth:</strong> ${appendUnit(bandwidthAvg, 'Mbps')}</p>
-                <p><strong>Jitter:</strong> ${appendUnit(jitterAvg, 'ms')}</p>
-                <p><strong>Interface:</strong> ${interfaceDisplay}</p>
-              </div>
-            `;
+                  <h2>${agentName}</h2>
+                  <p><strong>CPU:</strong> ${appendUnit(cpuAvg, '%')}</p>
+                  <p><strong>RAM:</strong> ${appendUnit(ramAvg, '%')}</p>
+                  <p><strong>Packet Loss:</strong> ${appendUnit(packetLossAvg, '%')}</p>
+                  <p><strong>Latency:</strong> ${appendUnit(latencyAvg, 'ms')}</p>
+                  <p><strong>Bandwidth:</strong> ${appendUnit(bandwidthAvg, 'Mbps')}</p>
+                  <p><strong>Jitter:</strong> ${appendUnit(jitterAvg, 'ms')}</p>
+                  <p><strong>Interface:</strong> ${interfaceDisplay}</p>
+                </div>
+              `;
 
             // Adicionar o cartão ao container
             container.innerHTML += card;
-          });
+          }
         }
 
         // Executar a função para gerar os cartões dinamicamente
-        createAgentCards();
+        createAgentCards(agentData);
+      })
+      .catch(error => {
+        console.error('Erro ao carregar metrics.json:', error);
       });
   });

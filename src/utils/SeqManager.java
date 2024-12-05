@@ -4,17 +4,17 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class SeqManager {
-    private static Map<Integer, Integer> seqMap;
+    private static Map<String, Integer> seqMap;
 
     public SeqManager() {
         seqMap = new HashMap<>();
     }
 
-    public void addRegistry(int agentID, int seq) {
+    public void addRegistry(String agentID, int seq) {
         seqMap.put(agentID, seq);
     }
 
-    public void addToExistingValue(int agentID, int updatedSeq) {
+    public void addToExistingValue(String agentID, int updatedSeq) {
         if (seqMap.containsKey(agentID)) {
             seqMap.put(agentID, updatedSeq); 
         } else {
@@ -28,13 +28,7 @@ public class SeqManager {
         return nextSeqnum;
     }
 
-    public int getSeqNumber(int agentID) {
+    public int getSeqNumber(String agentID) {
         return seqMap.get(agentID);
-    }
-
-    public void printSeqNumbers() {
-        for (Map.Entry<Integer, Integer> entry : seqMap.entrySet()) {
-            System.out.println("Key: " + entry.getKey() + " Value: " + entry.getValue());
-        }
     }
 }
