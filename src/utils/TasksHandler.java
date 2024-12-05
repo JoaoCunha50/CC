@@ -72,7 +72,7 @@ public class TasksHandler {
             process.waitFor();
 
         } catch (Exception e) {
-            e.printStackTrace();
+            Thread.currentThread().interrupt();
         }
         // Return the CPU usage
         return cpuUsage;
@@ -125,7 +125,7 @@ public class TasksHandler {
 
             }
         } catch (Exception e) {
-            System.err.println("An error occurred: " + e.getMessage());
+            Thread.currentThread().interrupt();
         }
         return latency;
     }
@@ -206,7 +206,7 @@ public class TasksHandler {
         } catch (IOException e) {
             System.err.println("Erro ao executar o comando: " + e.getMessage());
         } catch (InterruptedException e) {
-            System.err.println("O processo foi interrompido: " + e.getMessage());
+            Thread.currentThread().interrupt();
         }
         // System.out.println("A largura de banda é: " + bandwidth);
 
@@ -264,7 +264,7 @@ public class TasksHandler {
                 }
 
             } catch (Exception e) {
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
             }
         }
     }
@@ -329,7 +329,7 @@ public class TasksHandler {
                 }
 
             } catch (Exception e) {
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
             }
         }
     }
@@ -349,7 +349,7 @@ public class TasksHandler {
             finalPackets = getPacketsFromIp(interfaceName);
 
         } catch (Exception e) {
-            e.printStackTrace();
+            Thread.currentThread().interrupt();
             return -1.0; // Retornar -1.0 em caso de erro
         }
 
