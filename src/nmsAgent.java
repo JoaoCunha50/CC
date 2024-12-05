@@ -182,11 +182,18 @@ public class nmsAgent {
                                             AlertFlow handlerAlerts = new AlertFlow();
                                             double taskOutput = executeTasks(taskType, freq, iperfMode, destIP,
                                                     interfaceName);
-
-                                            if (taskOutput > threshold && taskOutput != 404) {
-                                                sendAlert(handlerAlerts, taskOutput, taskType, threshold);
+                                            if (taskType != 3) {
+                                                if (taskOutput > threshold && taskOutput != 404) {
+                                                    sendAlert(handlerAlerts, taskOutput, taskType, threshold);
+                                                } else {
+                                                    sendMetrics(handlerPDU, taskOutput, taskType);
+                                                }
                                             } else {
-                                                sendMetrics(handlerPDU, taskOutput, taskType);
+                                                if (taskOutput < threshold && taskOutput != 404) {
+                                                    sendAlert(handlerAlerts, taskOutput, taskType, threshold);
+                                                } else {
+                                                    sendMetrics(handlerPDU, taskOutput, taskType);
+                                                }
                                             }
 
                                             Thread.sleep(freq * 1000); // Espera pela frequência especificada
@@ -203,10 +210,18 @@ public class nmsAgent {
                                         // Executa a tarefa
                                         taskOutput = executeTasks(taskType, freq, iperfMode, destIP, interfaceName);
 
-                                        if (taskOutput > threshold && taskOutput != 404) {
-                                            sendAlert(handlerAlerts, taskOutput, taskType, threshold);
+                                        if (taskType != 3) {
+                                            if (taskOutput > threshold && taskOutput != 404) {
+                                                sendAlert(handlerAlerts, taskOutput, taskType, threshold);
+                                            } else {
+                                                sendMetrics(handlerPDU, taskOutput, taskType);
+                                            }
                                         } else {
-                                            sendMetrics(handlerPDU, taskOutput, taskType);
+                                            if (taskOutput < threshold && taskOutput != 404) {
+                                                sendAlert(handlerAlerts, taskOutput, taskType, threshold);
+                                            } else {
+                                                sendMetrics(handlerPDU, taskOutput, taskType);
+                                            }
                                         }
                                     } catch (InterruptedException e) {
                                         Thread.currentThread().interrupt();
