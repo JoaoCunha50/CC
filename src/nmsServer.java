@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.locks.ReentrantLock;
 
 import utils.*;
 import PDU.AlertFlow;
@@ -24,8 +25,8 @@ public class nmsServer {
     private Map<Integer, Thread> agentThreads = new HashMap<>();
     private Map<String, List<byte[]>> tasksMap = new ConcurrentHashMap<>();
     private NetworkUtils utils;
-    SeqManager seqNumbers = new SeqManager();
     private List<Thread> ThreadList = new ArrayList<>();
+    private ReentrantLock lock = new ReentrantLock();
 
     public nmsServer() throws IOException {
         this.TCPsocket = new ServerSocket(PortaTCP);
@@ -57,7 +58,7 @@ public class nmsServer {
         }
     }
 
-    private void handleClient(byte[] data, InetSocketAddress clientAddress) {
+    private void handleClient(byte[] data, InetSocketAddress clientSocketAddress) {
 
         int type = Byte.toUnsignedInt(data[data.length - 4]); // Ler o tipo (penúltimo byte antes de seqNum)
         if (type == NetTask.REGISTER) {
@@ -67,41 +68,44 @@ public class nmsServer {
             byte[] seqBytes = Arrays.copyOfRange(data, data.length - 3, data.length); // Últimos 3 bytes
             int seqNum = ByteBuffer.wrap(new byte[] { 0, seqBytes[0], seqBytes[1], seqBytes[2] }).getInt();
 
+            InetAddress clientAddress = clientSocketAddress.getAddress();
+
             // Synchronize the registration process
-            if (!agentRegistry.containsValue(clientAddress)) {
+            if (!agentRegistry.containsValue(clientSocketAddress)) {
                 utils.getReceived_UUID().add(dataUUID);
-                String agentId = clientAddress.getAddress().getHostName();
-                agentRegistry.put(agentId, clientAddress);
+                String agentId = clientSocketAddress.getAddress().getHostName();
+                agentRegistry.put(agentId, clientSocketAddress);
 
-                seqNumbers.addRegistry(agentId, seqNum);
+                utils.getSeqManager().add(clientAddress, seqNum);
 
-                System.out.println(
-                        "[REGISTER RECEIVED] Agent registered: ID = " + agentId + " IP: "
-                                + clientAddress.getAddress());
+                System.out.println("[REGISTER RECEIVED] Agent registered");
+                System.out.println("        ID: " + agentId);
+                System.out.println("        IP: " + clientAddress);
+                System.out.println();
 
-                int seqValue = seqNumbers.getSeqNumber(agentId);
-                int nextSeqNum = seqNumbers.getNextSeqNum(data, seqValue); // Gere o próximo seqNum
-                seqNumbers.addToExistingValue(agentId, nextSeqNum);
+                int ackValue = utils.getSeqManager().getSeqNumber(clientAddress);
+                int nextAckValue = utils.getSeqManager().getNextSeqNum(data, ackValue); // Gere o próximo seqNum
+                utils.getSeqManager().add(clientAddress, nextAckValue);
 
                 NetTask handler = new NetTask();
-                byte[] ackPDU = handler.createAckPDU(nextSeqNum, uuid);
+                byte[] ackPDU = handler.createAckPDU(nextAckValue, uuid);
 
-                utils.sendPacket(ackPDU, clientAddress);
+                utils.sendPacket(ackPDU, clientSocketAddress);
 
                 System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentId);
                 System.out.println("           UUID: " + dataUUID);
+                System.out.println("           Ack Value: " + nextAckValue);
                 System.out.println();
 
                 sendTasks(agentId);
             } else {
-                String agentId = getIDfromIP(clientAddress);
-                int nextSeqNum = seqNumbers.getNextSeqNum(data, seqNum); // Gere o próximo seqNum
-                seqNumbers.addToExistingValue(agentId, nextSeqNum);
+                String agentId = getIDfromIP(clientSocketAddress);
+                int nextSeqNum = utils.getSeqManager().getSeqNumber(clientAddress); // Gere o próximo seqNum
 
                 NetTask handler = new NetTask();
                 byte[] ackPDU = handler.createAckPDU(nextSeqNum, uuid); // Enviar o próximo seqNum no ACK
 
-                utils.sendPacket(ackPDU, clientAddress);
+                utils.sendPacket(ackPDU, clientSocketAddress);
 
                 sendTasks(agentId);
             }
@@ -126,18 +130,35 @@ public class nmsServer {
     }
 
     private void processTaskForAgent(String agentID, List<byte[]> taskPDUs) throws IOException {
-        // Verificar se o agente está registrado
-        InetSocketAddress clientAddress = agentRegistry.get(agentID);
+        lock.lock();
+        try {
+            // Verificar se o agente está registrado
+            InetSocketAddress clientSocketAddress = agentRegistry.get(agentID);
+            InetAddress clientAddress = clientSocketAddress.getAddress();
 
-        for (byte[] task : taskPDUs) {
-            int currentSeq = seqNumbers.getSeqNumber(agentID); // Obter número de sequência atual para o agente
+            for (byte[] task : taskPDUs) {
+                int currentSeq = utils.getSeqManager().getSeqNumber(clientAddress); // Obter número de sequência atual
+                                                                                    // para
+                                                                                    // o agente
+                String uuid = new String(Arrays.copyOfRange(task, 0, 36), StandardCharsets.UTF_8);
+                // Inserir número de sequência de 3 bytes no pacote
+                byte[] completeTask = insertSeqNumber(task, currentSeq);
+                System.out.println("[TASK SENT] Task sent to agent " + agentID);
+                System.out.println("            UUID: " + uuid);
+                System.out.println("            Seq Num: " + currentSeq);
+                System.out.println();
+                utils.queuePacket(completeTask, clientSocketAddress);
 
-            // Inserir número de sequência de 3 bytes no pacote
-            byte[] completeTask = insertSeqNumber(task, currentSeq);
-            System.out.println("[TASK SENT] Task sent to agent " + agentID);
-            System.out.println();
-            utils.queuePacket(completeTask, clientAddress);
+                while (utils.isUUIDPending(uuid) != null) {
+                    Thread.sleep(100);
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            lock.unlock();
         }
+
     }
 
     public static byte[] insertSeqNumber(byte[] originalArray, int seqNumber) {
@@ -181,13 +202,14 @@ public class nmsServer {
 
         if (type == NetTask.METRICS && !utils.getReceived_UUID().contains(pduUUID)) {
             utils.getReceived_UUID().add(pduUUID);
-            int ack_updated = seqNumbers.getNextSeqNum(bufferTemp, seqnum);
-            seqNumbers.addToExistingValue(agentID, ack_updated);
+            int ack_updated = utils.getSeqManager().getNextSeqNum(bufferTemp, seqnum);
+            utils.getSeqManager().add(clientAddress.getAddress(), ack_updated);
 
             byte[] ackPDU = handler.createAckPDU(ack_updated, uuid);
 
             System.out.println("[METRICS RECEIVED] Task Output received:");
             System.out.println("     agentID:  " + agentID);
+            System.out.println("     seqNum:  " + seqnum);
             System.out.println("     taskUUID: " + pduUUID);
             System.out.println("     taskType: " + taskType);
             System.out.println("     metrics:  " + output);
@@ -197,16 +219,15 @@ public class nmsServer {
 
             System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
             System.out.println("           UUID: " + pduUUID);
+            System.out.println("           ackValue " + ack_updated);
             System.out.println();
 
-            String agentID_String = "agent" + agentID;
-            OutputHandler.saveMetricsToJson(agentID_String, pduUUID, output, taskType);
+            OutputHandler.saveMetricsToJson(agentID, pduUUID, output, taskType);
             return;
 
         } else if (type == NetTask.METRICS && utils.getReceived_UUID().contains(pduUUID)) {
-            int seq_updated = seqNumbers.getNextSeqNum(bufferTemp, seqnum);
-            seqNumbers.addToExistingValue(agentID, seq_updated);
-            byte[] ackPDU = handler.createAckPDU(seq_updated, uuid);
+            int seq = utils.getSeqManager().getSeqNumber(clientAddress.getAddress());
+            byte[] ackPDU = handler.createAckPDU(seq, uuid);
 
             utils.sendPacket(ackPDU, clientAddress);
             return;
@@ -240,35 +261,35 @@ public class nmsServer {
             // Processa alertas
             if (type == AlertFlow.ALERT && !utils.getReceived_UUID().contains(pduUUID)) {
                 utils.getReceived_UUID().add(pduUUID);
-                int seqUpdated = seqNumbers.getNextSeqNum(bufferTemp, seqnum);
-                seqNumbers.addToExistingValue(agentID, seqUpdated);
+                int ackUpdated = utils.getSeqManager().getNextSeqNum(bufferTemp, seqnum);
+                utils.getSeqManager().add(clientAdress, ackUpdated);
 
                 // Cria o ACK
-                byte[] ackPDU = handler.createAckPDU(seqUpdated, uuid);
+                byte[] ackPDU = handler.createAckPDU(ackUpdated, uuid);
 
                 // Envia o ACK pelo TCP
                 output.write(ackPDU);
                 output.flush();
 
                 // Exibe e salva as métricas
-                System.out.println("[ALERTFLOW] TASK OUTPUT EXCEEDED THRESHOLD:");
-                System.out.println("     taskUUID: " + pduUUID);
-                System.out.println("     metrics:  " + outputMetric);
-                System.out.println("     threshold:  " + threshold);
-                System.out.println("     taskType:  " + taskType);
+                System.out.println("[ALERTFLOW RECEIVED] TASK OUTPUT EXCEEDED THRESHOLD:");
+                System.out.println("           taskUUID: " + pduUUID);
+                System.out.println("           seqNum:  " + seqnum);
+                System.out.println("           metrics:  " + outputMetric);
+                System.out.println("           threshold:  " + threshold);
+                System.out.println("           taskType:  " + taskType);
                 System.out.println();
 
                 System.out.println("[ACK SENT] Acknowledgement sent to agent " + agentID);
                 System.out.println("           UUID: " + pduUUID);
+                System.out.println("           ackValue:  " + ackUpdated);
                 System.out.println();
 
-                String agentID_String = "agent" + agentID;
-                OutputHandler.saveAlertsToJson(agentID_String, pduUUID, outputMetric, taskType, threshold);
+                OutputHandler.saveAlertsToJson(agentID, pduUUID, outputMetric, taskType, threshold);
                 return;
 
             } else if (type == AlertFlow.ALERT && utils.getReceived_UUID().contains(pduUUID)) {
-                int ackUpdated = seqNumbers.getNextSeqNum(bufferTemp, seqnum);
-                seqNumbers.addToExistingValue(agentID, ackUpdated);
+                int ackUpdated = utils.getSeqManager().getSeqNumber(clientAdress);
 
                 // Cria o ACK
                 byte[] ackPDU = handler.createAckPDU(ackUpdated, uuid);
@@ -288,13 +309,14 @@ public class nmsServer {
         NetTask handler = new NetTask();
         byte[] endPDU = handler.createEndPDU(seqnum);
         String pduUUID = new String(Arrays.copyOfRange(endPDU, 0, 36), StandardCharsets.UTF_8);
+        int type = Byte.toUnsignedInt(endPDU[36]);
 
         utils.queuePacket(endPDU, clientAddress);
 
         String agentID = getIDfromIP(clientAddress);
         System.out.println("[END CONNECTION] Sending end of connection message to " + agentID);
-        System.out.println("     taskUUID: " + pduUUID);
-        System.out.println("     Sequence Number:  " + seqnum);
+        System.out.println("                 UUID: " + pduUUID);
+        System.out.println("                 type:  " + type);
         System.out.println();
 
     }
@@ -317,7 +339,7 @@ public class nmsServer {
                     t.interrupt();
                 }
             }
-            
+
             // Fechar threads, se necessário
             for (Thread agentThread : agentThreads.values()) {
                 if (agentThread.isAlive()) {
@@ -343,7 +365,7 @@ public class nmsServer {
         }
 
         utils.stopThreads();
-        System.out.println("Server closing...");
+        System.out.println("[INFO] Server closing...");
         System.exit(0);
     }
 
@@ -368,8 +390,6 @@ public class nmsServer {
         });
         ThreadList.add(tcpListener);
         tcpListener.start();
-        
-        
 
         // Loop principal para aguardar pacotes UDP
         Thread udpListener = new Thread(() -> {
@@ -428,10 +448,9 @@ public class nmsServer {
 
                 if (connectionsAreActive) {
                     for (Map.Entry<String, InetSocketAddress> entry : agentRegistry.entrySet()) {
-                        String agentID = entry.getKey();
                         InetSocketAddress clientAddress = entry.getValue();
 
-                        int seq = seqNumbers.getSeqNumber(agentID);
+                        int seq = utils.getSeqManager().getSeqNumber(clientAddress.getAddress());
 
                         processEndConnection(seq, clientAddress);
                     }

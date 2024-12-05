@@ -19,7 +19,7 @@
         "tasks": [
             {
                 "task_type": 5,
-                "frequency": 1,
+                "frequency": 10,
                 "alertflow_condition": 88,
                 "mode": "client",
                 "destination_ip": "10.0.7.10" 
