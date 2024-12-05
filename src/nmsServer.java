@@ -43,7 +43,6 @@ public class nmsServer {
     }
 
     private void handleTCPClient(Socket clientSocket) {
-        System.out.println("olaola");
         try (InputStream input = clientSocket.getInputStream()) {
             byte[] buffer = new byte[1024];
             int bytesRead;
@@ -318,24 +317,24 @@ public class nmsServer {
                     t.interrupt();
                 }
             }
-
-            // Fechar o socket TCP
-            if (TCPsocket != null && !TCPsocket.isClosed()) {
-                TCPsocket.close();
-                System.out.println("TCP Server socket closed.");
-            }
-
-            // Fechar o socket UDP
-            if (socket != null && !socket.isClosed()) {
-                socket.close();
-                System.out.println("UDP Server socket closed.");
-            }
-
+            
             // Fechar threads, se necessário
             for (Thread agentThread : agentThreads.values()) {
                 if (agentThread.isAlive()) {
                     agentThread.interrupt(); // Interromper os threads de agentes
                 }
+            }
+
+            // Fechar o socket TCP
+            if (TCPsocket != null && !TCPsocket.isClosed()) {
+                TCPsocket.close();
+                System.out.println("[INFO] TCP Server socket closed.");
+            }
+
+            // Fechar o socket UDP
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+                System.out.println("[INFO] UDP Server socket closed.");
             }
 
             Thread.sleep(2000);
@@ -354,18 +353,23 @@ public class nmsServer {
         System.out.println("TCP Port: " + PortaTCP);
         System.out.println();
 
-        // Thread para aceitar conexões TCP
-        while (!Thread.currentThread().isInterrupted()) {
-                Thread tcpListener = new Thread(() -> {
-                try (Socket clientSocket = TCPsocket.accept()) {
-                    handleTCPClient(clientSocket);
+        Thread tcpListener = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    Socket clientSocket = TCPsocket.accept();
+                    // Criar uma nova thread para cada cliente TCP conectado
+                    Thread clientHandlerThread = new Thread(() -> handleTCPClient(clientSocket));
+                    ThreadList.add(clientHandlerThread);
+                    clientHandlerThread.start();
                 } catch (IOException e) {
                     System.out.println("IOException listening to TCP alerts: " + e.getMessage());
                 }
-            });
-            ThreadList.add(tcpListener);
-            tcpListener.start();
-        }
+            }
+        });
+        ThreadList.add(tcpListener);
+        tcpListener.start();
+        
+        
 
         // Loop principal para aguardar pacotes UDP
         Thread udpListener = new Thread(() -> {
