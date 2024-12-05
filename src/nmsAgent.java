@@ -266,15 +266,15 @@ public class nmsAgent {
             byte[] alertUUIDBytes = Arrays.copyOfRange(alertPDU, 0, 36);
             String alertUUID = new String(alertUUIDBytes, StandardCharsets.UTF_8);
             boolean ackReceived = false;
-            int retryCount = 0;
-    
+
             System.out.println("[ALERTFLOW SENT] Alert sent to server.");
             System.out.println("     taskUUID: " + alertUUID);
             System.out.println("     metrics:  " + taskOutput);
             System.out.println("     threshold:  " + threshold);
             System.out.println("     task_type:  " + taskType);
             System.out.println();
-    
+
+            // Send the alert PDU via TCP
             try {
                 outputTCP.write(alertPDU);
                 outputTCP.flush();
@@ -283,53 +283,38 @@ public class nmsAgent {
                 System.err.println("[ERROR] Failed to send alert PDU via TCP: " + e.getMessage());
                 return;
             }
-    
-            TCPSocket.setSoTimeout(5000); // 10 segundos
-            while (!ackReceived && retryCount < 3) {
+
+            // Wait for acknowledgment from the TCP stream
+            while (!ackReceived) {
                 try {
-                    byte[] ackPDU = new byte[1024];
+                    byte[] ackPDU = new byte[1024]; // Adjust buffer size as needed
                     int bytesRead = inputTCP.read(ackPDU);
-    
+
                     if (bytesRead > 0) {
+                        // Extract acknowledgment data
                         int typeInt = Byte.toUnsignedInt(ackPDU[36]);
-                        String uuid = new String(Arrays.copyOfRange(ackPDU, 0, 36), StandardCharsets.UTF_8);
-    
+                        String uuid = new String(Arrays.copyOfRange(ackPDU, 0, 36), StandardCharsets.UTF_8); // Type
+                                                                                                             // byte
+                        byte[] ackBytes = Arrays.copyOfRange(ackPDU, 37, 40); // ACK sequence number
+                        int ackInt = ByteBuffer.wrap(new byte[] { 0, ackBytes[0], ackBytes[1], ackBytes[2] }).getInt();
+
+                        // Validate the acknowledgment
                         if (typeInt == NetTask.ACKNOWLEDGE && utils.isUUIDPending(uuid)) {
                             utils.removePendingPacketByUUID(uuid);
                             ackReceived = true;
                             System.out.println("[ACK RECEIVED] Acknowledgement received.");
                             System.out.println("        UUID: " + uuid);
                             System.out.println();
+                        } else {
+                            sendAlert(handlerPDU, taskOutput, taskType, threshold);
                         }
                     } else {
-                        retryCount++;
-                        if (retryCount < 3) {
-                            System.out.println("[RETRYING] Retrying to send alert...");
-                            outputTCP.write(alertPDU);
-                            outputTCP.flush();
-                        }
-                    }
-                } catch (SocketTimeoutException e) {
-                    retryCount++;
-                    System.err.println("[ERROR] Timeout while waiting for ACK. Retry: " + retryCount);
-                    try{
-                        if (retryCount < 3) {
-                            outputTCP.write(alertPDU);
-                            outputTCP.flush();
-                        }
-                    }catch(IOException ex){
-                        System.err.println("[ERROR] v2 : Failed to receive acknowledgment via TCP: " + e.getMessage());
+                        System.out.println("[ERROR] No data received. Retrying...");
                     }
                 } catch (IOException e) {
                     System.err.println("[ERROR] Failed to receive acknowledgment via TCP: " + e.getMessage());
                 }
             }
-            if (!ackReceived) {
-                System.err.println("[ERROR] Maximum retransmission attempts reached. Closing connection.");
-            }
-            TCPSocket.setSoTimeout(0);
-        } catch (SocketException e) {
-            System.err.println("[ERROR] Socket Exception: " + e.getMessage());
         } finally {
             lock.unlock();
         }

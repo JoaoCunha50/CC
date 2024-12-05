@@ -5,13 +5,11 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.ReentrantLock;
 
 import PDU.AlertFlow;
 import PDU.NetTask;
 
 public class NetworkUtils {
-    private final ReentrantLock lock = new ReentrantLock();
     private final DatagramSocket socket;
     private final List<String> received_UUID;
     private final BlockingQueue<PacketTask> sendQueue;
@@ -141,7 +139,6 @@ public class NetworkUtils {
 
     public void queuePacket(byte[] data, InetSocketAddress clientAddress) {
         sendQueue.add(new PacketTask(data, clientAddress));
-        System.out.println(data.length);
     }
 
     public void sendPacket(byte[] data, InetSocketAddress clientAddress) {
