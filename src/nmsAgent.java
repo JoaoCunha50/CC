@@ -103,7 +103,7 @@ public class nmsAgent {
                                     payloadLength = 2;
                                     break;
                                 case 2:
-                                    payloadLength = 9;
+                                    payloadLength = 6;
                                     break;
                                 case 3:
                                 case 4:
@@ -143,18 +143,20 @@ public class nmsAgent {
                                 iperfMode = -1;
 
                             byte[] ipBytes = null;
-                            if (iperfMode == 0) {
+                            if (iperfMode == 0 || taskType == 2) {
                                 ipBytes = Arrays.copyOfRange(bufferPayload, bufferPayload.length - 4,
                                         bufferPayload.length);
                             }
 
+
                             final String destIP;
-                            if ((taskType == 3 || taskType == 4 || taskType == 5) && ipBytes != null) {
+                            if ((taskType == 2 || taskType == 3 || taskType == 4 || taskType == 5) && ipBytes != null) {
                                 InetAddress inetAddress = InetAddress.getByAddress(ipBytes);
                                 destIP = inetAddress.getHostAddress();
                             } else {
                                 destIP = "0.0.0.0";
                             }
+
 
                             lock.lock(); // Apenas para melhor entendimento dos prints !!
                             try {

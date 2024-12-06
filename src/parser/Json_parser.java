@@ -66,12 +66,12 @@ public class Json_parser {
                                 interfaceName = (String) taskJson.get("interfaceName");
                             }
 
-                            if ("client".equals(mode) && taskJson.containsKey("destination_ip")) {
+                            if (taskJson.containsKey("destination_ip")) {
                                 String destination_ip = (String) taskJson.get("destination_ip");
                                 if (destination_ip != null) {
                                     destIpAddress = InetAddress.getByName(destination_ip);
                                 }
-                            } else if ("server".equals(mode)) {
+                            } else {
                                 destIpAddress = InetAddress.getByName("0.0.0.0");
                             }
 
@@ -81,7 +81,6 @@ public class Json_parser {
                                     task_type,
                                     frequency,
                                     alertflow_condition,
-                                    InetAddress.getByName("192.168.1.1"),
                                     destIpAddress,
                                     interfaceName, // Passar o interfaceName para o NetTask
                                     mode);

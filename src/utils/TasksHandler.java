@@ -15,6 +15,8 @@ public class TasksHandler {
     public double handleTasks(int task, int frequency, String ip, int mode, String interfaceName)
             throws InterruptedException {
         double output = 404;
+        System.out.println("[INFO] Executing Task");
+        System.out.println();
         switch (task) {
             case 0:
                 return measureCPUusage();
@@ -143,7 +145,6 @@ public class TasksHandler {
         }
 
         double avgValue = Double.parseDouble(avg);
-        System.out.println(avgValue);
 
         return avgValue;
     }
@@ -170,47 +171,59 @@ public class TasksHandler {
     }
 
     private static double getIperfBandwidth(String serverIp) {
-        String command = "iperf3 -c " + serverIp + " -t 5 -f m"; // "-f m" para exibir a largura de banda em Mbps
-        double bandwidth = -1.0; // Valor inicial negativo indicando que a largura de banda não foi encontrada.
+        double bandwidth = -1;
+        while (true) {
+            try {
+                String command = "iperf3 -c " + serverIp + " -t 5 -f m"; // "-f m" para exibir a largura de banda em
+                                                                         // Mbps
+                // Usando o ProcessBuilder para rodar o comando no sistema operacional
+                ProcessBuilder builder = new ProcessBuilder(command.split(" "));
 
-        try {
-            // Usando o ProcessBuilder para rodar o comando no sistema operacional
-            ProcessBuilder builder = new ProcessBuilder(command.split(" "));
+                // Captura a saída do processo
+                Process process = builder.start();
 
-            // Captura a saída do processo
-            Process process = builder.start();
+                // Ler a saída do processo e procurar pela linha que contém a largura de banda
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
 
-            // Ler a saída do processo e procurar pela linha que contém a largura de banda
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
+                String line;
 
-            while ((line = reader.readLine()) != null) {
-                if (line.contains("Mbits/sec")) { // A linha com a largura de banda contém "Mbits/sec"
-                    // Encontrando a largura de banda na linha
-                    String[] parts = line.split("\\s+");
-                    String bandwidthStr = parts[parts.length - 2]; // Largura de banda geralmente está na penúltima
-                                                                   // posição
-
-                    try {
-                        // Convertendo para double
-                        bandwidth = Double.parseDouble(bandwidthStr);
-                    } catch (NumberFormatException e) {
-                        System.err.println("Erro ao converter a largura de banda: " + e.getMessage());
+                // Verifica por erro "Connection Refused" no fluxo de erro
+                while ((line = errorReader.readLine()) != null) {
+                    if (line.contains("Connection refused")) {
+                        System.out.println("[IPERF SERVER CLOSED]: Sleeping for 5 seconds");
+                        // Aguarda 5 segundos antes de tentar novamente
+                        Thread.sleep(5000); // Sleep por 5 segundos
+                        break; // Volta para o começo do loop e tenta novamente
                     }
-                    break;
                 }
+
+                while ((line = reader.readLine()) != null) {
+                    if (line.contains("Mbits/sec")) { // A linha com a largura de banda contém "Mbits/sec"
+                        // Encontrando a largura de banda na linha
+                        String[] parts = line.split("\\s+");
+                        String bandwidthStr = parts[parts.length - 2]; // Largura de banda geralmente está na penúltima
+                                                                       // posição
+
+                        try {
+                            // Convertendo para double
+                            bandwidth = Double.parseDouble(bandwidthStr);
+                            return bandwidth;
+                        } catch (NumberFormatException e) {
+                            System.err.println("Erro ao converter a largura de banda: " + e.getMessage());
+                        }
+                        break;
+                    }
+                }
+
+                process.waitFor();
+
+            } catch (IOException e) {
+                System.err.println("Erro ao executar o comando: " + e.getMessage());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
-
-            process.waitFor();
-
-        } catch (IOException e) {
-            System.err.println("Erro ao executar o comando: " + e.getMessage());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
         }
-        // System.out.println("A largura de banda é: " + bandwidth);
-
-        return bandwidth;
     }
 
     private static double getIperfJitter(String serverIp) {
@@ -257,8 +270,7 @@ public class TasksHandler {
                     for (int i = 0; i < parts.length; i++) {
                         if (parts[i].equals("ms") && i > 0) { // Encontra "ms" e pega o valor anterior
                             double jitterMs = Double.parseDouble(parts[i - 1]); // Converte o valor anterior para double
-                            double jitterSeconds = jitterMs * 1000.0; // Converte milissegundos para microsegundos
-                            return jitterSeconds; // Retorna o jitter em microsegundos
+                            return jitterMs; // Retorna o jitter em microsegundos
                         }
                     }
                 }
