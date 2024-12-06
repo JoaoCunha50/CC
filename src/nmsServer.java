@@ -194,7 +194,7 @@ public class nmsServer {
         int taskType = Byte.toUnsignedInt(bufferTemp[40]);
         double output = Byte.toUnsignedInt(bufferTemp[41]);
 
-        if (taskType == 5) { // para converter este output no seu valor real
+        if (taskType == 5 ) { // para converter este output no seu valor real
             output /= 10;
         }
 
@@ -370,9 +370,9 @@ public class nmsServer {
     }
 
     public void start() {
-        System.out.println("Server started, waiting for packets...");
-        System.out.println("UDP Port: " + PortaUDP);
-        System.out.println("TCP Port: " + PortaTCP);
+        System.out.println("[INFO] Server started, waiting for packets...");
+        System.out.println("[UDP Port] => " + PortaUDP);
+        System.out.println("[TCP Port] => " + PortaTCP);
         System.out.println();
 
         Thread tcpListener = new Thread(() -> {
@@ -457,7 +457,7 @@ public class nmsServer {
                 }
                 scanner.close();
                 closeServer();
-                System.out.println("Server shut down successfully.");
+                System.out.println("[SHUTDOWN] Server shut down successfully.");
                 break; // Exit the loop and end the server
             }
         }

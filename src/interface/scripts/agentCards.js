@@ -79,22 +79,22 @@ fetch('../../../outputs/alerts.json')
               .concat(alerts.filter(item => item.taskType === 0).map(item => item.metrics));
             const ramMetrics = metrics.filter(item => item.taskType === 1).map(item => item.metrics)
               .concat(alerts.filter(item => item.taskType === 1).map(item => item.metrics));
-            const packetLossMetrics = metrics.filter(item => item.taskType === 2).map(item => item.metrics)
-              .concat(alerts.filter(item => item.taskType === 2).map(item => item.metrics));
-            const latencyMetrics = metrics.filter(item => item.taskType === 3).map(item => item.metrics)
-              .concat(alerts.filter(item => item.taskType === 3).map(item => item.metrics));
-            const bandwidthMetrics = metrics.filter(item => item.taskType === 4).map(item => item.metrics)
-              .concat(alerts.filter(item => item.taskType === 4).map(item => item.metrics));
-            const jitterMetrics = metrics.filter(item => item.taskType === 5).map(item => item.metrics)
+            const packetLossMetrics = metrics.filter(item => item.taskType === 5).map(item => item.metrics)
               .concat(alerts.filter(item => item.taskType === 5).map(item => item.metrics));
+            const latencyMetrics = metrics.filter(item => item.taskType === 2).map(item => item.metrics)
+              .concat(alerts.filter(item => item.taskType === 2).map(item => item.metrics));
+            const bandwidthMetrics = metrics.filter(item => item.taskType === 3).map(item => item.metrics)
+              .concat(alerts.filter(item => item.taskType === 3).map(item => item.metrics));
+            const jitterMetrics = metrics.filter(item => item.taskType === 4).map(item => item.metrics)
+              .concat(alerts.filter(item => item.taskType === 4).map(item => item.metrics));
             const interfaceMetrics = metrics.filter(item => item.taskType === 6).map(item => item.metrics)
               .concat(alerts.filter(item => item.taskType === 6).map(item => item.metrics));
 
             // Calcular as médias ou exibir "NA" se não houver dados
             const cpuAvg = calculateAverage(cpuMetrics);
             const ramAvg = calculateAverage(ramMetrics);
-            const packetLossAvg = calculateAverage(packetLossMetrics);
             const latencyAvg = calculateAverage(latencyMetrics);
+            const packetLossAvg = calculateAverage(packetLossMetrics);
             const bandwidthAvg = calculateAverage(bandwidthMetrics);
             const jitterAvg = calculateAverage(jitterMetrics);
             const interfaceAvg = calculateAverage(interfaceMetrics);
@@ -114,8 +114,8 @@ fetch('../../../outputs/alerts.json')
                 <h2>${agentName}</h2>
                 <p><strong>CPU:</strong> ${appendUnit(cpuAvg, '%')}</p>
                 <p><strong>RAM:</strong> ${appendUnit(ramAvg, '%')}</p>
-                <p><strong>Packet Loss:</strong> ${appendUnit(packetLossAvg, '%')}</p>
                 <p><strong>Latency:</strong> ${appendUnit(latencyAvg, 'ms')}</p>
+                <p><strong>Packet Loss:</strong> ${appendUnit(packetLossAvg, '%')}</p>
                 <p><strong>Bandwidth:</strong> ${appendUnit(bandwidthAvg, 'Mbps')}</p>
                 <p><strong>Jitter:</strong> ${appendUnit(jitterAvg, 'ms')}</p>
                 <p><strong>Interface:</strong> ${interfaceDisplay}</p>

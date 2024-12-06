@@ -48,7 +48,7 @@ public class NetTask implements Serializable {
         return buffer.array();
     }
 
-    public byte[] createTaskPDU(int taskType, int freq, int threshold, InetAddress source, InetAddress destination,
+    public byte[] createTaskPDU(int taskType, int freq, int threshold, InetAddress destination,
             String interfaceName, String mode) {
         switch (taskType) {
             case 0: // CPU Task
@@ -56,7 +56,7 @@ public class NetTask implements Serializable {
             case 1: // RAM Task
                 return createRAMtask(freq, threshold);
             case 2: // Latency Task
-                return createLatencyTask(freq, threshold, source, destination);
+                return createLatencyTask(freq, threshold, destination);
             case 3: // Throughput Task
                 return createBandwidthTask(freq, threshold, destination, mode);
             case 4: // Interface Task
@@ -79,7 +79,6 @@ public class NetTask implements Serializable {
         byte type_byte = (byte) type;
         byte taskType_byte = (byte) taskType;
         byte freq_byte = (byte) freq;
-        System.out.println("criando task com uuid de " + new String(uuidBytes, StandardCharsets.UTF_8));
         byte threshold_byte = (byte) threshold;
 
         ByteBuffer buffer = ByteBuffer.allocate(40);
@@ -124,7 +123,7 @@ public class NetTask implements Serializable {
         return ramTaskPDU;
     }
 
-    public byte[] createLatencyTask(int freq, int threshold, InetAddress source, InetAddress dest) {
+    public byte[] createLatencyTask(int freq, int threshold, InetAddress dest) {
         String uuid = UUID.randomUUID().toString();
         int type = TASK;
         int taskType = 2; // definido anteriormente
@@ -134,17 +133,15 @@ public class NetTask implements Serializable {
         byte taskType_byte = (byte) taskType;
         byte freq_byte = (byte) freq;
         byte threshold_byte = (byte) threshold;
-        byte[] sourceBytes = source.getAddress();
         byte[] destBytes = dest.getAddress();
 
-        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 12);
+        ByteBuffer buffer = ByteBuffer.allocate(uuidBytes.length + 8);
 
         buffer.put(uuidBytes);
         buffer.put(type_byte);
         buffer.put(taskType_byte);
         buffer.put(freq_byte);
         buffer.put(threshold_byte);
-        buffer.put(sourceBytes);
         buffer.put(destBytes);
 
         byte[] latencyTaskPDU = buffer.array();
