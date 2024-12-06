@@ -40,23 +40,32 @@ public class nmsAgent {
     }
 
     public void register() {
+        try {
+            System.out.println(
+                    "[AGENT] TCP socket connected to server at " + serverAddress.toString() + ":" + serverPort);
+            System.out.println();
 
-        System.out.println(
-                "[AGENT] TCP socket connected to server at " + serverAddress.toString() + ":" + serverPort);
-        System.out.println();
+            NetTask handler = new NetTask();
+            byte[] registerPDU = handler.createRegisterPDU(1);
+            String RegisterUUID = new String(Arrays.copyOfRange(registerPDU, 0, 36), StandardCharsets.UTF_8);
 
-        NetTask handler = new NetTask();
-        byte[] registerPDU = handler.createRegisterPDU(1);
-        String RegisterUUID = new String(Arrays.copyOfRange(registerPDU, 0, 36), StandardCharsets.UTF_8);
+            System.out.println("[REGISTER SENT] Register PDU sent.");
+            System.out.println("           UUID: " + RegisterUUID);
+            System.out.println("           seqNum: " + 1);
+            System.out.println();
 
-        System.out.println("[REGISTER SENT] Register PDU sent.");
-        System.out.println("           UUID: " + RegisterUUID);
-        System.out.println("           seqNum: " + 1);
-        System.out.println();
+            utils.getSeqManager().add(serverAddress, 1);
 
-        utils.getSeqManager().add(serverAddress, 1);
+            utils.queuePacket(registerPDU, serverSocketAddress);
 
-        utils.queuePacket(registerPDU, serverSocketAddress);
+            utils.receivePacket();
+            
+            while (utils.isUUIDPending(RegisterUUID) != null) {
+                Thread.sleep(100);
+            }
+        } catch (IOException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public void receiveTasks() {
@@ -148,7 +157,6 @@ public class nmsAgent {
                                         bufferPayload.length);
                             }
 
-
                             final String destIP;
                             if ((taskType == 2 || taskType == 3 || taskType == 4 || taskType == 5) && ipBytes != null) {
                                 InetAddress inetAddress = InetAddress.getByAddress(ipBytes);
@@ -156,7 +164,6 @@ public class nmsAgent {
                             } else {
                                 destIP = "0.0.0.0";
                             }
-
 
                             lock.lock(); // Apenas para melhor entendimento dos prints !!
                             try {
