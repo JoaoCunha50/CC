@@ -64,7 +64,6 @@ public class nmsServer {
         if (type == NetTask.REGISTER) {
             byte[] uuid = Arrays.copyOfRange(data, 0, 36);
             String dataUUID = new String(uuid, StandardCharsets.UTF_8);
-            // Ler os 3 bytes do seqNum
             byte[] seqBytes = Arrays.copyOfRange(data, data.length - 3, data.length); // Últimos 3 bytes
             int seqNum = ByteBuffer.wrap(new byte[] { 0, seqBytes[0], seqBytes[1], seqBytes[2] }).getInt();
 
@@ -194,7 +193,7 @@ public class nmsServer {
         int taskType = Byte.toUnsignedInt(bufferTemp[40]);
         double output = Byte.toUnsignedInt(bufferTemp[41]);
 
-        if (taskType == 5 ) { // para converter este output no seu valor real
+        if (taskType == 5) { // para converter este output no seu valor real
             output /= 10;
         }
 
@@ -304,7 +303,7 @@ public class nmsServer {
         }
     }
 
-    private void processEndConnection(int seqnum, InetSocketAddress clientAddress) {
+    private void sendEndPDU(int seqnum, InetSocketAddress clientAddress) {
 
         NetTask handler = new NetTask();
         byte[] endPDU = handler.createEndPDU(seqnum);
@@ -452,7 +451,7 @@ public class nmsServer {
 
                         int seq = utils.getSeqManager().getSeqNumber(clientAddress.getAddress());
 
-                        processEndConnection(seq, clientAddress);
+                        sendEndPDU(seq, clientAddress);
                     }
                 }
                 scanner.close();
